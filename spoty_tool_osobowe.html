@@ -982,6 +982,134 @@ let polyVertexMarkers = [];
 let polyMidMarkers = [];
 let polyPreviewLayer = null;
 
+// measure-distance tool
+let measureMode = false;
+let measurePoints = [];
+let measureMarkers = [];
+let measureLine = null;
+let contextMenuEl = null;
+
+function pointInPolygon(lat, lng, latlngs){
+  let inside = false;
+  for(let i=0, j=latlngs.length-1; i<latlngs.length; j=i++){
+    const yi = latlngs[i][0], xi = latlngs[i][1];
+    const yj = latlngs[j][0], xj = latlngs[j][1];
+    const intersect = ((yi>lat) !== (yj>lat)) && (lng < (xj-xi)*(lat-yi)/(yj-yi)+xi);
+    if(intersect) inside = !inside;
+  }
+  return inside;
+}
+function findZoneAt(lat, lng){
+  const zones = state.zones[currentCity] || [];
+  for(let i=zones.length-1; i>=0; i--){
+    if(pointInPolygon(lat, lng, zones[i].latlngs)) return zones[i];
+  }
+  return null;
+}
+function formatDistance(meters){
+  if(meters >= 1000) return (meters/1000).toFixed(2) + ' km';
+  return Math.round(meters) + ' m';
+}
+function totalMeasureDistance(){
+  let total = 0;
+  for(let i=1;i<measurePoints.length;i++) total += measurePoints[i-1].distanceTo(measurePoints[i]);
+  return total;
+}
+function measurePointIcon(){
+  return L.divIcon({className:'vertex-handle', iconSize:[10,10], iconAnchor:[5,5]});
+}
+function clearMeasureLayers(){
+  measureMarkers.forEach(m=>map.removeLayer(m));
+  measureMarkers = [];
+  if(measureLine){ map.removeLayer(measureLine); measureLine=null; }
+}
+function redrawMeasureLine(){
+  if(measureLine){ map.removeLayer(measureLine); measureLine=null; }
+  if(measurePoints.length>=2){
+    measureLine = L.polyline(measurePoints, {color:'#185fa5', weight:3, dashArray:'6 6'}).addTo(map);
+  }
+}
+function startMeasure(latlng){
+  if(polyMode) cancelPoly();
+  measureMode = true;
+  measurePoints = [];
+  clearMeasureLayers();
+  addMeasurePoint(latlng);
+  setDrawingCursor(true);
+}
+function addMeasurePoint(latlng){
+  measurePoints.push(latlng);
+  measureMarkers.push(L.marker(latlng, {icon: measurePointIcon()}).addTo(map));
+  redrawMeasureLine();
+  renderMapControls();
+}
+function stopMeasure(){
+  measureMode = false;
+  measurePoints = [];
+  clearMeasureLayers();
+  setDrawingCursor(false);
+  renderMapControls();
+}
+function closeMapContextMenu(){
+  if(contextMenuEl){ contextMenuEl.remove(); contextMenuEl = null; }
+}
+document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeMapContextMenu(); });
+function showMapContextMenu(screenX, screenY, latlng){
+  closeMapContextMenu();
+  const zone = findZoneAt(latlng.lat, latlng.lng);
+  const menu = document.createElement('div');
+  menu.id = 'map-context-menu';
+  menu.style.cssText = 'position:fixed;left:'+screenX+'px;top:'+screenY+'px;background:var(--s1);border:1px solid var(--bds);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.3);z-index:6000;min-width:220px;padding:6px;';
+  let html = `<button class="zone-type-btn" id="cm-add-parking">📍 Dodaj parking tutaj</button>`;
+  if(zone){
+    const style = ZONE_STYLES[zone.type];
+    html += `<button class="zone-type-btn" id="cm-modify-zone" style="background:var(--bgacc);color:var(--acc);border-color:var(--bgacc);">✏️ Zmień kształt (${style.label})</button>`;
+    if(zone.type === 'proponowana'){
+      html += `<button class="zone-type-btn" id="cm-add-excluded" style="background:var(--bgdang);color:var(--dang);border-color:var(--bgdang);">Dodaj do wykluczonej</button>`;
+    }
+    html += `<button class="zone-type-btn" id="cm-delete-zone" style="background:var(--bgdang);color:var(--dang);border-color:var(--bgdang);">🗑️ Usuń strefę</button>`;
+  }
+  html += `<button class="zone-type-btn" id="cm-measure">📏 Mierz odległość od tego punktu</button>`;
+  html += `<button class="zone-type-btn" id="cm-cancel">Anuluj</button>`;
+  menu.innerHTML = html;
+  document.body.appendChild(menu);
+  contextMenuEl = menu;
+  document.getElementById('cm-add-parking').addEventListener('click', ()=>{
+    closeMapContextMenu();
+    openParkingModal(null, {city: currentCity, lat: Number(latlng.lat.toFixed(5)), lng: Number(latlng.lng.toFixed(5))});
+  });
+  if(zone){
+    document.getElementById('cm-modify-zone').addEventListener('click', ()=>{
+      closeMapContextMenu();
+      startPolyEdit(zone);
+    });
+    if(zone.type === 'proponowana'){
+      document.getElementById('cm-add-excluded').addEventListener('click', async ()=>{
+        closeMapContextMenu();
+        const { error } = await supabaseClient.from('zones').update({type:'wykluczona'}).eq('id', zone.id);
+        if(error){ dbError('aktualizacja strefy', error); return; }
+        zone.type = 'wykluczona';
+        flashSaved();
+        buildOverlaysForCity();
+      });
+    }
+    document.getElementById('cm-delete-zone').addEventListener('click', async ()=>{
+      closeMapContextMenu();
+      if(!confirm('Na pewno usunąć tę strefę?')) return;
+      const { error } = await supabaseClient.from('zones').delete().eq('id', zone.id);
+      if(error){ dbError('usuwanie strefy', error); return; }
+      state.zones[currentCity] = (state.zones[currentCity]||[]).filter(zz=>zz.id!==zone.id);
+      flashSaved();
+      buildOverlaysForCity();
+    });
+  }
+  document.getElementById('cm-measure').addEventListener('click', ()=>{
+    closeMapContextMenu();
+    startMeasure(latlng);
+  });
+  document.getElementById('cm-cancel').addEventListener('click', closeMapContextMenu);
+}
+
 function vertexIcon(){
   return L.divIcon({className:'vertex-handle', iconSize:[14,14], iconAnchor:[7,7]});
 }
@@ -1051,10 +1179,15 @@ function buildMap(){
   }).addTo(map);
 
   map.on('click', function(e){
+    if(measureMode){ addMeasurePoint(e.latlng); return; }
     if(polyMode==='draw'){ addPolyVertex(e.latlng); return; }
     if(polyMode==='edit') return;
     if(exportSelectMode) return;
     openParkingModal(null, {city: currentCity, lat: Number(e.latlng.lat.toFixed(5)), lng: Number(e.latlng.lng.toFixed(5))});
+  });
+  map.on('contextmenu', function(e){
+    if(polyMode || exportSelectMode || measureMode) return;
+    showMapContextMenu(e.originalEvent.clientX, e.originalEvent.clientY, e.latlng);
   });
 
   buildOverlaysForCity();
@@ -1084,6 +1217,8 @@ function escCloseFullscreen(e){
 
 function cancelAnyMapAction(){
   if(polyMode) cancelPoly();
+  if(measureMode) stopMeasure();
+  closeMapContextMenu();
 }
 
 /* --- controls panel: switches between default / drawing / editing --- */
@@ -1108,6 +1243,14 @@ function renderMapControls(){
     hint.textContent = 'Złap punkt i przeciągnij, żeby zmienić kształt. Prawy klik na punkcie go usuwa. Klik na małym punkcie na krawędzi dodaje nowy wierzchołek (więcej załamań).';
     document.getElementById('m-edit-save').addEventListener('click', finishPoly);
     document.getElementById('m-edit-cancel').addEventListener('click', cancelPoly);
+  } else if(measureMode){
+    const dist = totalMeasureDistance();
+    wrap.innerHTML = `
+      <span class="hint">Punkty: ${measurePoints.length} • Dystans: ${formatDistance(dist)}</span>
+      <button id="m-measure-finish" class="primary">Zakończ pomiar</button>
+    `;
+    hint.textContent = 'Klikaj lewym przyciskiem na mapie, żeby dodawać kolejne punkty pomiaru odległości.';
+    document.getElementById('m-measure-finish').addEventListener('click', stopMeasure);
   } else if(exportSelectMode){
     wrap.innerHTML = `
       <span class="hint">Zaznaczono: ${exportSelectedIds.size}</span>
@@ -1139,7 +1282,7 @@ function renderMapControls(){
       <button id="m-import-kml">⬆️ Importuj KML</button>
       <button id="m-fullscreen">${isMax? '✕ Zamknij pełny ekran' : '⛶ Pełny ekran'}</button>
     `;
-    hint.textContent = 'Kliknij dowolny punkt mapy, żeby dodać tam parking. Kliknij "Rysuj strefę", żeby zaznaczyć obszar. Kliknij istniejącą strefę, żeby ją zmienić lub usunąć.';
+    hint.textContent = 'Kliknij dowolny punkt mapy, żeby dodać tam parking. Kliknij "Rysuj strefę", żeby zaznaczyć obszar. Kliknij istniejącą strefę, żeby ją zmienić lub usunąć. Prawy klik w dowolnym miejscu mapy pokazuje menu ze wszystkimi akcjami (dodaj parking, zmień/usuń strefę, zmierz odległość).';
     document.getElementById('m-draw-toggle').addEventListener('click', ()=>{
       document.getElementById('zone-overlay').classList.add('show');
     });
@@ -1173,6 +1316,7 @@ document.getElementById('zone-cancel').addEventListener('click', ()=>{
 });
 
 function startPolyDraw(type){
+  if(measureMode) stopMeasure();
   polyMode = 'draw';
   polyType = type;
   polyEditingZoneId = null;
@@ -1181,6 +1325,7 @@ function startPolyDraw(type){
   renderMapControls();
 }
 function startPolyEdit(zone){
+  if(measureMode) stopMeasure();
   polyMode = 'edit';
   polyType = zone.type;
   polyEditingZoneId = zone.id;
@@ -1337,7 +1482,7 @@ function buildOverlaysForCity(){
     const layer = L.polygon(z.latlngs, {color:style.color, fillColor:style.fillColor, fillOpacity: selected?0.35:0.15, weight: selected?5:2});
     if(visible) layer.addTo(map);
     layer.on('click', function(e){
-      if(polyMode) return;
+      if(polyMode || measureMode) return;
       L.DomEvent.stopPropagation(e);
       if(exportSelectMode){
         if(exportSelectedIds.has(z.id)) exportSelectedIds.delete(z.id); else exportSelectedIds.add(z.id);
@@ -1644,7 +1789,7 @@ function plotParkingMarkers(){
       m = L.circleMarker([p.lat,p.lng], {radius:7, color:'#fff', weight:1.5, fillColor:color, fillOpacity:1}).addTo(map);
     }
     m.on('click', e=> {
-      if(polyMode) return;
+      if(polyMode || measureMode) return;
       L.DomEvent.stopPropagation(e);
       openDetailsModal(p.id);
     });
@@ -1859,6 +2004,12 @@ function renderSettings(){
     </div>
     <p class="sub" style="margin-top:10px;">Wartości domyślne wczytane z planu projektu — zaktualizuj je, jeśli cele się zmieniły.</p>
 
+    <p class="section-title" style="margin-top:24px;">Kopia zapasowa</p>
+    <div class="card">
+      <p class="hint" style="margin:0 0 10px;">Pobiera jeden plik ze wszystkim, co jest w bazie: parkingi, strefy, cele i zadania. Warto klikać od czasu do czasu (np. raz w tygodniu) i zachować plik na dysku — darmowy plan Supabase nie robi automatycznych kopii zapasowych.</p>
+      <button id="backup-btn">⬇️ Pobierz pełną kopię zapasową</button>
+    </div>
+
     <p class="section-title" style="margin-top:24px;">Migracja starych danych z tej przeglądarki</p>
     <div class="card">
       <p class="hint" style="margin:0 0 10px;">Jednorazowo przenosi dane zapisane wcześniej lokalnie w tej przeglądarce (parkingi, strefy, zadania, cele) do wspólnej bazy. Bezpieczne do kliknięcia więcej niż raz — nie nadpisze nowszych danych w bazie tym samym rekordem.</p>
@@ -1875,6 +2026,32 @@ function renderSettings(){
     });
   });
   document.getElementById('migrate-btn').addEventListener('click', migrateFromLocalStorage);
+  document.getElementById('backup-btn').addEventListener('click', exportFullBackup);
+}
+async function exportFullBackup(){
+  const [parkingsRes, targetsRes, zonesRes, tasksRes] = await Promise.all([
+    supabaseClient.from('parkings').select('*'),
+    supabaseClient.from('targets').select('*'),
+    supabaseClient.from('zones').select('*'),
+    supabaseClient.from('tasks').select('*')
+  ]);
+  if(parkingsRes.error || targetsRes.error || zonesRes.error || tasksRes.error){
+    dbError('pobieranie kopii zapasowej', parkingsRes.error||targetsRes.error||zonesRes.error||tasksRes.error);
+    return;
+  }
+  const backup = {
+    exportedAt: new Date().toISOString(),
+    parkings: parkingsRes.data||[],
+    targets: targetsRes.data||[],
+    zones: zonesRes.data||[],
+    tasks: tasksRes.data||[]
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'spot_backup_' + toDateStr(new Date()) + '.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 async function migrateFromLocalStorage(){
   const prefix = 'spoty_osobowe_';
