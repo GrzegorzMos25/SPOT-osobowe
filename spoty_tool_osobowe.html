@@ -1,0 +1,1969 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<title>Traficar Spot — pojazdy osobowe</title>
+<style>
+:root{
+  --s0: var(--surface-0, #f4f3ef);
+  --s1: var(--surface-1, #ffffff);
+  --s2: var(--surface-2, #ffffff);
+  --tp: var(--text-primary, #1c1c1a);
+  --ts: var(--text-secondary, #6b6a64);
+  --tm: var(--text-muted, #9a9990);
+  --bd: var(--border, #e3e1d9);
+  --bds: var(--border-strong, #c9c7bc);
+  --acc: var(--text-accent, #185fa5);
+  --bgacc: var(--bg-accent, #e6f1fb);
+  --succ: var(--text-success, #3b6d11);
+  --bgsucc: var(--bg-success, #eaf3de);
+  --warn: var(--text-warning, #854f0b);
+  --bgwarn: var(--bg-warning, #faeeda);
+  --dang: var(--text-danger, #a32d2d);
+  --bgdang: var(--bg-danger, #fcebeb);
+  --dang-light: #c17a7a;
+  --bgdang-light: #f7e6e6;
+  --radius: 8px;
+}
+*{box-sizing:border-box;}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--s0);color:var(--tp);}
+.app{max-width:1180px;margin:0 auto;padding:20px 24px 60px;}
+h1{font-size:20px;font-weight:500;margin:0 0 4px;}
+.sub{font-size:13px;color:var(--ts);margin:0 0 18px;}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--bd);margin-bottom:20px;flex-wrap:wrap;}
+.tab-btn{background:none;border:none;padding:10px 14px;font-size:14px;color:var(--ts);cursor:pointer;border-bottom:2px solid transparent;}
+.tab-btn.active{color:var(--tp);border-bottom-color:var(--acc);font-weight:500;}
+.tab-btn:hover{color:var(--tp);}
+.view{display:none;}
+.view.active{display:block;}
+.card{background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:16px;}
+.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:18px;}
+.metric{background:var(--s1);border:1px solid var(--bd);border-radius:var(--radius);padding:14px;}
+.metric .l{font-size:12px;color:var(--ts);margin:0 0 6px;}
+.metric .v{font-size:22px;font-weight:500;margin:0;}
+.section-title{font-size:13px;font-weight:500;color:var(--ts);margin:0 0 8px;}
+table{width:100%;border-collapse:collapse;font-size:13px;table-layout:auto;}
+th{text-align:left;padding:9px 12px;background:var(--s1);color:var(--ts);font-weight:500;border-bottom:1px solid var(--bd);border-right:1px solid var(--bd);white-space:nowrap;vertical-align:middle;}
+th:last-child{border-right:none;}
+td{padding:9px 12px;border-bottom:1px solid var(--bd);border-right:1px solid var(--bd);vertical-align:middle;line-height:1.4;}
+td:last-child{border-right:none;}
+tbody tr:hover td{background:var(--s0);}
+tr:last-child td{border-bottom:none;}
+.tbl-fixed{table-layout:fixed;width:auto;}
+.tbl-fixed td.cell-wrap{white-space:normal;overflow-wrap:break-word;word-break:break-word;}
+.tbl-fixed .pill{white-space:normal;}
+.filter-row th{padding:5px 8px;background:var(--s0);}
+.filter-row input,.filter-row select{width:100%;box-sizing:border-box;font-size:12px;padding:5px 6px;}
+.row-actions{display:flex;flex-direction:column;align-items:stretch;gap:3px;}
+.row-actions button{font-size:11px;padding:4px 8px;}
+.row-actions .complete-flag{font-size:12px;text-align:center;}
+input,select,textarea{font-family:inherit;font-size:13px;padding:7px 9px;border:1px solid var(--bds);border-radius:6px;background:var(--s2);color:var(--tp);}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--acc);}
+button{font-family:inherit;font-size:13px;padding:7px 12px;border:1px solid var(--bds);border-radius:6px;background:var(--s2);color:var(--tp);cursor:pointer;}
+button:hover{background:var(--s1);}
+button.primary{background:var(--acc);border-color:var(--acc);color:#fff;}
+button.primary:hover{opacity:0.9;}
+button.danger{color:var(--dang);}
+.pill{display:inline-block;font-size:12px;padding:2px 9px;border-radius:6px;white-space:nowrap;}
+.pill.aktywny{background:var(--bgsucc);color:var(--succ);}
+.pill.rozmowy{background:var(--bgwarn);color:var(--warn);}
+.pill.typowany{background:var(--bd);color:var(--ts);}
+.pill.odrzucony{background:var(--bgdang);color:var(--dang);}
+.pill.skycash-on{background:var(--bgdang);color:var(--dang);}
+.pill.skycash-off{background:var(--bgsucc);color:var(--succ);}
+.toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;justify-content:space-between;}
+.toolbar-left{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;overflow-y:auto;}
+.overlay.show{display:flex;justify-content:center;align-items:flex-start;padding:40px 16px;}
+.modal{background:var(--s1);border-radius:12px;padding:20px 22px;width:440px;max-width:92vw;}
+.modal h3{font-size:16px;font-weight:500;margin:0 0 14px;}
+.field{margin-bottom:12px;}
+.field label{display:block;font-size:12px;color:var(--ts);margin-bottom:4px;}
+.field input,.field select,.field textarea{width:100%;}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
+#map{height:480px;border-radius:12px;width:100%;background:var(--s1);}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ts);margin-top:10px;}
+.legend span.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px;}
+.legend .sq{display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:-1px;border-radius:2px;}
+.empty{text-align:center;padding:40px 20px;color:var(--tm);font-size:14px;}
+.zone-type-btn{display:block;width:100%;text-align:left;padding:10px 12px;margin-bottom:8px;border-radius:6px;}
+.save-flash{font-size:12px;color:var(--succ);opacity:0;transition:opacity .3s;}
+.save-flash.show{opacity:1;}
+canvas{max-width:100%;}
+.hint{font-size:12px;color:var(--ts);}
+.city-tile-btn{padding:8px 14px;border-radius:20px;font-size:13px;border:1px solid var(--bds);background:var(--s2);}
+.city-tile-btn.active{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:500;}
+.vertex-handle{width:14px;height:14px;border-radius:50%;background:#185fa5;border:2px solid #fff;box-shadow:0 0 3px rgba(0,0,0,0.5);cursor:grab;}
+.vertex-handle.mid{background:rgba(24,95,165,0.55);box-shadow:none;cursor:copy;}
+#map.drawing-cursor, #map.drawing-cursor .leaflet-grab{cursor:crosshair !important;}
+.city-parkings-wrap{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin-top:18px;}
+.cal-day{border:1px solid var(--bd);border-radius:8px;min-height:64px;padding:6px;cursor:pointer;position:relative;background:var(--s1);}
+.cal-day:hover{background:var(--s0);}
+.cal-day.today{border-color:var(--acc);border-width:2px;}
+.cal-day-num{font-size:13px;color:var(--tp);}
+.cal-day-dot{position:absolute;bottom:6px;right:6px;background:var(--acc);color:#fff;font-size:11px;border-radius:10px;padding:0 6px;line-height:1.6;}
+.cal-daynames{text-align:center;font-size:11px;color:var(--ts);padding:4px 0;}
+#map-fullscreen-wrap.map-maximized{position:fixed;inset:0;z-index:2000;background:var(--s0);padding:20px;overflow-y:auto;}
+#map-fullscreen-wrap.map-maximized #map{height:calc(100vh - 170px);}
+body.map-maximized-active{overflow:hidden;}
+</style>
+</head>
+<body>
+<div id="login-screen" style="display:none;position:fixed;inset:0;background:var(--s0);z-index:5000;align-items:center;justify-content:center;">
+  <div class="modal" style="width:320px;">
+    <h3 style="margin:0 0 4px;">Traficar Spot</h3>
+    <p class="hint" style="margin:0 0 16px;">Podaj hasło zespołu, żeby wejść do narzędzia.</p>
+    <div class="field">
+      <label>Hasło</label>
+      <input type="password" id="login-password" placeholder="Hasło">
+    </div>
+    <p id="login-error" style="color:var(--dang);font-size:12px;margin:0 0 10px;display:none;"></p>
+    <button class="primary" id="login-submit" style="width:100%;">Zaloguj</button>
+  </div>
+</div>
+<div class="app" id="app-root" style="display:none;">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+    <div>
+      <h1>Traficar Spot — pojazdy osobowe</h1>
+      <p class="sub">Narzędzie robocze projektu: mapy miast, baza parkingów, postęp wg miast.</p>
+    </div>
+    <button id="logout-btn" style="margin-top:2px;">Wyloguj</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-view="dashboard">Dashboard</button>
+    <button class="tab-btn" data-view="map">Mapa miast</button>
+    <button class="tab-btn" data-view="table">Baza parkingów</button>
+    <button class="tab-btn" data-view="charts">Wykresy postępu</button>
+    <button class="tab-btn" data-view="calendar">Kalendarz</button>
+    <button class="tab-btn" data-view="settings">Ustawienia</button>
+  </div>
+
+  <div id="view-dashboard" class="view active"></div>
+  <div id="view-map" class="view"></div>
+  <div id="view-table" class="view"></div>
+  <div id="view-charts" class="view"></div>
+  <div id="view-calendar" class="view"></div>
+  <div id="view-settings" class="view"></div>
+</div>
+
+<div class="overlay" id="parking-overlay">
+  <div class="modal">
+    <h3 id="parking-modal-title">Dodaj parking</h3>
+    <input type="hidden" id="f-id">
+    <div class="field">
+      <label>Nazwa parkingu</label>
+      <input id="f-name" placeholder="np. Dworzec Towarowy">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Miasto</label>
+        <select id="f-city"></select>
+      </div>
+      <div class="field">
+        <label>Status</label>
+        <select id="f-status">
+          <option value="aktywny">Aktywny</option>
+          <option value="rozmowy">W rozmowach</option>
+          <option value="typowany">Typowany</option>
+          <option value="odrzucony">Odrzucony</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Adres</label>
+      <input id="f-address" placeholder="ulica, numer">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Liczba miejsc</label>
+        <input id="f-capacity" type="number" min="0">
+      </div>
+      <div class="field">
+        <label>Koszt miesięczny (zł)</label>
+        <input id="f-cost" type="number" min="0">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Szerokość geo. (lat)</label>
+        <input id="f-lat" type="number" step="0.00001">
+      </div>
+      <div class="field">
+        <label>Długość geo. (lng)</label>
+        <input id="f-lng" type="number" step="0.00001">
+      </div>
+    </div>
+    <div class="field">
+      <label>Data wygaśnięcia umowy (opcjonalnie)</label>
+      <input id="f-contract" type="date">
+    </div>
+    <div class="field">
+      <label>SkyCash</label>
+      <select id="f-skycash">
+        <option value="wlaczony">Włączony</option>
+        <option value="wylaczony">Wyłączony</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Kompletność</label>
+      <input type="hidden" id="f-complete" value="false">
+      <button type="button" id="f-complete-btn" style="width:100%;"></button>
+    </div>
+    <div class="modal-actions">
+      <button id="f-cancel">Anuluj</button>
+      <button class="primary" id="f-save">Zapisz</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="details-overlay">
+  <div class="modal" style="width:560px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px;">
+      <div>
+        <h3 id="details-title" style="margin:0 0 4px;">Szczegóły parkingu</h3>
+        <p class="hint" id="details-subtitle" style="margin:0;"></p>
+      </div>
+      <div style="flex-shrink:0;">
+        <input type="hidden" id="dt-complete" value="false">
+        <button type="button" id="dt-complete-btn" style="white-space:nowrap;"></button>
+      </div>
+    </div>
+    <input type="hidden" id="dt-id">
+
+    <div style="display:grid;grid-template-columns:140px 1fr;gap:14px;margin-bottom:14px;">
+      <div>
+        <div id="dt-photo-preview" style="width:140px;height:105px;border-radius:8px;overflow:hidden;background:var(--s0);display:flex;align-items:center;justify-content:center;border:1px solid var(--bd);"></div>
+        <input type="file" id="dt-photo-input" accept="image/*" style="margin-top:6px;font-size:11px;width:140px;padding:4px;">
+      </div>
+      <div id="dt-quick-facts" style="font-size:13px;"></div>
+    </div>
+
+    <div class="field">
+      <label>Opis</label>
+      <textarea id="dt-description" rows="2" placeholder="krótki opis lokalizacji"></textarea>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Zarządca</label>
+        <input id="dt-manager" placeholder="imię, telefon, e-mail...">
+      </div>
+      <div class="field">
+        <label>ID umowy</label>
+        <input id="dt-contract-id">
+      </div>
+    </div>
+    <div class="field">
+      <label>Uwagi</label>
+      <textarea id="dt-notes" rows="2" placeholder="np. bez szlabanu..."></textarea>
+    </div>
+    <div class="field">
+      <label>Wymagane działania</label>
+      <textarea id="dt-required-action" rows="2" placeholder="np. brakuje skanu umowy, czekamy na pilota do szlabanu..."></textarea>
+    </div>
+    <div class="modal-actions" style="justify-content:space-between;">
+      <button id="dt-edit">✏️ Edytuj</button>
+      <div style="display:flex;gap:8px;">
+        <button id="dt-cancel">Anuluj</button>
+        <button class="primary" id="dt-save">Zapisz</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<div class="overlay" id="kml-import-overlay">
+  <div class="modal" style="width:520px;">
+    <h3>Import stref z KML</h3>
+    <p class="hint" style="margin:0 0 12px;">Wybierz typ dla każdej znalezionej strefy. Wszystkie trafią do miasta: <b id="kml-import-city"></b>.</p>
+    <div id="kml-import-list" style="max-height:320px;overflow-y:auto;"></div>
+    <div class="modal-actions">
+      <button id="kml-import-cancel">Anuluj</button>
+      <button class="primary" id="kml-import-confirm">Importuj</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="kml-file-input" accept=".kml" style="display:none;">
+<input type="file" id="excel-file-input" accept=".xlsx,.xls" style="display:none;">
+
+<div class="overlay" id="zone-overlay">
+  <div class="modal">
+    <h3>Jaki to typ strefy?</h3>
+    <button class="zone-type-btn" data-zone="traficar" style="background:var(--bgsucc);color:var(--succ);border-color:var(--bgsucc);">Strefa Traficar (freefloating)</button>
+    <button class="zone-type-btn" data-zone="spp" style="background:var(--bgacc);color:var(--acc);border-color:var(--bgacc);">Strefa płatnego parkowania (SPP)</button>
+    <button class="zone-type-btn" data-zone="proponowana" style="background:var(--bgdang-light);color:var(--dang-light);border-color:var(--bgdang-light);">Strefa proponowana (do wykluczenia)</button>
+    <button class="zone-type-btn" data-zone="wykluczona" style="background:var(--bgdang);color:var(--dang);border-color:var(--bgdang);">Strefa wykluczona</button>
+    <div class="modal-actions">
+      <button id="zone-cancel">Anuluj (usuń rysunek)</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="zone-action-overlay">
+  <div class="modal">
+    <h3 id="zone-action-title">Strefa</h3>
+    <button class="zone-type-btn" id="za-modify" style="background:var(--bgacc);color:var(--acc);border-color:var(--bgacc);">Modyfikuj kształt</button>
+    <button class="zone-type-btn" id="za-add-excluded" style="display:none;background:var(--bgdang);color:var(--dang);border-color:var(--bgdang);">Dodaj do wykluczonej</button>
+    <button class="zone-type-btn" id="za-delete" style="background:var(--bgdang);color:var(--dang);border-color:var(--bgdang);">Usuń strefę</button>
+    <div class="modal-actions">
+      <button id="za-cancel">Anuluj</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="day-overlay">
+  <div class="modal">
+    <h3 id="day-overlay-title">Zadania</h3>
+    <div id="day-tasks-list"></div>
+    <div class="modal-actions" style="justify-content:space-between;">
+      <button id="day-add-task">+ Dodaj zadanie</button>
+      <button id="day-close">Zamknij</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="task-overlay">
+  <div class="modal">
+    <h3 id="task-modal-title">Nowe zadanie</h3>
+    <input type="hidden" id="tk-id">
+    <div class="field">
+      <label>Data</label>
+      <input id="tk-date" type="date">
+    </div>
+    <div class="field">
+      <label>Tytuł zadania</label>
+      <input id="tk-title" placeholder="np. Kontakt do zarządcy parkingu">
+    </div>
+    <div class="field">
+      <label>Uwagi (opcjonalnie)</label>
+      <textarea id="tk-notes" rows="2"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button id="tk-cancel">Anuluj</button>
+      <button class="primary" id="tk-save">Zapisz</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script>
+const CITIES = {
+  "Wrocław": [51.1079, 17.0385],
+  "Poznań": [52.4064, 16.9252],
+  "Katowice": [50.2649, 19.0238],
+  "Łódź": [51.7592, 19.4560],
+  "Szczecin": [53.4285, 14.5528],
+  "Kraków": [50.0647, 19.9450],
+  "Gdańsk": [54.3520, 18.6466],
+  "Warszawa": [52.2297, 21.0122]
+};
+const DEFAULT_TARGETS = { "Katowice":8, "Wrocław":10, "Poznań":12, "Łódź":7, "Szczecin":10, "Kraków":19, "Gdańsk":29, "Warszawa":23 };
+const ZONE_STYLES = {
+  traficar:{color:'#2e7d32', fillColor:'#2e7d32', label:'Strefa Traficar'},
+  spp:{color:'#185fa5', fillColor:'#185fa5', label:'Strefa płatnego parkowania'},
+  proponowana:{color:'#c17a7a', fillColor:'#c17a7a', label:'Strefa proponowana (do wykluczenia)'},
+  wykluczona:{color:'#a32d2d', fillColor:'#a32d2d', label:'Strefa wykluczona'}
+};
+const STATUS_COLOR = {aktywny:'#3b6d11', rozmowy:'#854f0b', typowany:'#6b6a64', odrzucony:'#a32d2d'};
+const STATUS_LABEL = {aktywny:'Aktywny', rozmowy:'W rozmowach', typowany:'Typowany', odrzucony:'Odrzucony'};
+
+let state = { parkings: [], targets: {...DEFAULT_TARGETS}, zones: {}, tasks: [] };
+let currentCity = Object.keys(CITIES)[0];
+let chart;
+let calDate = new Date();
+const MONTH_NAMES = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
+const DAY_NAMES = ['Pon','Wt','Śr','Czw','Pt','Sob','Nie'];
+
+const SUPABASE_URL = 'https://atczzqphkzcwixnlxhsa.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_UHT8Kl7Ku3T272GvkYnooA_t0eY9ywL';
+const SHARED_LOGIN_EMAIL = 'zespol@spot-osobowe.local';
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+function flashSaved(){
+  const el = document.getElementById('save-flash');
+  if(!el) return;
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), 1200);
+}
+function dbError(action, error){
+  console.error(action, error);
+  alert('Błąd zapisu do bazy (' + action + '): ' + (error && error.message ? error.message : error));
+}
+function parkingToRow(p){
+  return {
+    id: p.id, name: p.name||'', city: p.city, status: p.status, address: p.address||'',
+    capacity: Number(p.capacity)||0, cost: Number(p.cost)||0,
+    lat: (p.lat===undefined?null:p.lat), lng: (p.lng===undefined?null:p.lng),
+    contract_end: p.contractEnd || null, skycash: p.skycash||'wlaczony', complete: !!p.complete,
+    notes: p.notes||'', description: p.description||'', manager: p.manager||'',
+    contract_id: p.contractId||'', required_action: p.requiredAction||'', photo: p.photo||null
+  };
+}
+function rowToParking(r){
+  return {
+    id: r.id, name: r.name||'', city: r.city, status: r.status, address: r.address||'',
+    capacity: r.capacity||0, cost: r.cost||0, lat: r.lat, lng: r.lng,
+    contractEnd: r.contract_end||'', skycash: r.skycash||'wlaczony', complete: !!r.complete,
+    notes: r.notes||'', description: r.description||'', manager: r.manager||'',
+    contractId: r.contract_id||'', requiredAction: r.required_action||'', photo: r.photo||null
+  };
+}
+function rowToZone(r){ return {id:r.id, type:r.type, latlngs:r.latlngs}; }
+async function loadAll(){
+  const [parkingsRes, targetsRes, zonesRes, tasksRes] = await Promise.all([
+    supabaseClient.from('parkings').select('*'),
+    supabaseClient.from('targets').select('*'),
+    supabaseClient.from('zones').select('*'),
+    supabaseClient.from('tasks').select('*')
+  ]);
+  state.parkings = (parkingsRes.data||[]).map(rowToParking);
+  state.targets = {...DEFAULT_TARGETS};
+  (targetsRes.data||[]).forEach(r=>{ state.targets[r.city] = r.target; });
+  state.zones = {};
+  (zonesRes.data||[]).forEach(r=>{
+    if(!state.zones[r.city]) state.zones[r.city] = [];
+    state.zones[r.city].push(rowToZone(r));
+  });
+  state.tasks = (tasksRes.data||[]).map(r=>({id:r.id, date:r.date, title:r.title, notes:r.notes||'', done:!!r.done}));
+}
+function uid(){ return 'p' + Math.random().toString(36).slice(2,10); }
+function esc(s){ return (s||'').toString().replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function toDateStr(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function formatTaskDate(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  const today = new Date(); today.setHours(0,0,0,0);
+  const diff = Math.round((d-today)/(1000*3600*24));
+  if(diff===0) return 'dziś';
+  if(diff===1) return 'jutro';
+  return d.toLocaleDateString('pl-PL', {day:'numeric', month:'short'});
+}
+
+/* ---------- TABS ---------- */
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    btn.classList.add('active');
+    const v = btn.dataset.view;
+    document.getElementById('view-'+v).classList.add('active');
+    if(v==='map') initMapView();
+    if(v==='charts') renderCharts();
+    if(v==='dashboard') renderDashboard();
+    if(v==='table') renderTable();
+    if(v==='calendar') renderCalendar();
+    if(v==='settings') renderSettings();
+  });
+});
+
+/* ---------- DASHBOARD ---------- */
+function renderDashboard(){
+  const el = document.getElementById('view-dashboard');
+  const active = state.parkings.filter(p=>p.status==='aktywny');
+  const rozmowy = state.parkings.filter(p=>p.status==='rozmowy');
+  const totalTarget = Object.values(state.targets).reduce((a,b)=>a+Number(b||0),0);
+  const missing = totalTarget - active.length;
+  const cost = active.reduce((a,p)=>a+Number(p.cost||0),0);
+
+  const today = new Date();
+  const soon = state.parkings.filter(p=>{
+    if(!p.contractEnd) return false;
+    const d = new Date(p.contractEnd);
+    const diff = (d-today)/(1000*3600*24);
+    return diff >=0 && diff <= 30;
+  }).sort((a,b)=> new Date(a.contractEnd)-new Date(b.contractEnd));
+
+  const todayStr = toDateStr(new Date());
+  const nextTask = state.tasks.filter(t=>!t.done && t.date>=todayStr).sort((a,b)=>a.date.localeCompare(b.date))[0];
+  const taskTileContent = nextTask
+    ? `<span style="font-size:15px;font-weight:500;display:block;">${esc(nextTask.title)}</span><span style="font-size:12px;color:var(--ts);">${formatTaskDate(nextTask.date)}</span>`
+    : `<span style="font-size:14px;color:var(--tm);">Brak zaplanowanych zadań</span>`;
+  const upcomingTasks = state.tasks.filter(t=>!t.done && t.date>=todayStr).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,5);
+
+  el.innerHTML = `
+    <div class="grid4">
+      <div class="metric"><p class="l">Aktywne spoty</p><p class="v">${active.length}</p></div>
+      <div class="metric"><p class="l">W rozmowach</p><p class="v">${rozmowy.length}</p></div>
+      <div class="metric"><p class="l">Brakuje do celu</p><p class="v" style="color:${missing>0?'var(--dang)':'var(--succ)'}">${missing>0?'-'+missing:0}</p></div>
+      <div class="metric"><p class="l">Koszt miesięczny (aktywne)</p><p class="v">${cost.toLocaleString('pl-PL')} zł</p></div>
+      <div class="metric"><p class="l">Zadania</p>${taskTileContent}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:16px;">
+      <div>
+        <p class="section-title">Umowy wygasające w ciągu 30 dni</p>
+        <div class="card" style="padding:0;margin-bottom:16px;">
+          ${soon.length? soon.map(p=>`
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--bd);">
+              <div style="flex:1;">
+                <p style="margin:0;font-size:14px;">${esc(p.name)}</p>
+                <p style="margin:0;font-size:12px;color:var(--tm);">${esc(p.city)} · wygasa ${p.contractEnd}</p>
+              </div>
+              <span class="pill rozmowy">wkrótce</span>
+            </div>`).join('') : `<div class="empty">Brak zbliżających się terminów.</div>`}
+        </div>
+        <p class="section-title">Nadchodzące zadania</p>
+        <div class="card" style="padding:0;">
+          ${upcomingTasks.length? upcomingTasks.map(t=>`
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--bd);">
+              <div style="flex:1;">
+                <p style="margin:0;font-size:14px;">${esc(t.title)}</p>
+                ${t.notes? `<p style="margin:0;font-size:12px;color:var(--tm);">${esc(t.notes)}</p>` : ''}
+              </div>
+              <span class="pill typowany">${formatTaskDate(t.date)}</span>
+            </div>`).join('') : `<div class="empty">Brak zaplanowanych zadań.</div>`}
+        </div>
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <p class="section-title" style="margin:0;">Postęp wg miast</p>
+          <button id="dl-progress-img" title="Pobierz jako obraz" style="padding:4px 9px;">⬇️</button>
+        </div>
+        <div class="card" id="progress-by-city-card">
+          ${Object.keys(CITIES).map(c=>{
+            const have = state.parkings.filter(p=>p.city===c && p.status==='aktywny').length;
+            const target = Number(state.targets[c]||0);
+            const pct = target? Math.min(100, Math.round(have/target*100)) : 0;
+            return `<div style="margin-bottom:10px;">
+              <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ts);margin-bottom:3px;">
+                <span>${c}</span><span>${have} / ${target||'-'}</span>
+              </div>
+              <div style="background:var(--bd);border-radius:4px;height:6px;overflow:hidden;">
+                <div style="width:${pct}%;background:var(--acc);height:100%;"></div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('dl-progress-img').addEventListener('click', downloadProgressImage);
+}
+async function downloadProgressImage(){
+  const node = document.getElementById('progress-by-city-card');
+  try{
+    const canvas = await html2canvas(node, {backgroundColor:'#ffffff', scale:2});
+    const link = document.createElement('a');
+    link.download = 'postep_wg_miast.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  }catch(e){
+    alert('Nie udało się wygenerować obrazu.');
+  }
+}
+
+/* ---------- TABLE ---------- */
+const EMPTY_TABLE_FILTER = { name:'', city:'', address:'', capacity:'', cost:'', costPerSpot:'', status:'', skycash:'', contract:'' };
+let editFilter = {...EMPTY_TABLE_FILTER};
+function renderTable(){
+  const el = document.getElementById('view-table');
+  el.innerHTML = `
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <button id="t-clear-filters">Wyczyść filtry</button>
+      </div>
+      <div class="toolbar-left">
+        <span class="save-flash" id="save-flash">Zapisano</span>
+        <button class="primary" id="t-add">+ Dodaj parking</button>
+        <button id="t-export">Eksportuj do Excela</button>
+        <button id="t-export-full">Eksportuj pełne dane (Excel)</button>
+        <button id="t-import-excel">⬆️ Importuj z Excela</button>
+      </div>
+    </div>
+    <div class="card" style="padding:0;overflow-x:auto;">
+      <table class="tbl-fixed">
+        <colgroup>
+          <col style="width:220px"><col style="width:90px"><col style="width:210px">
+          <col style="width:60px"><col style="width:80px"><col style="width:90px">
+          <col style="width:85px"><col style="width:75px"><col style="width:120px"><col style="width:110px">
+        </colgroup>
+        <tr>
+          <th>Nazwa parkingu</th><th>Miasto</th><th>Adres</th><th>Miejsca</th>
+          <th>Koszt/mc</th><th>Koszt/miejsce</th><th>Status</th><th>SkyCash</th><th>Umowa do</th><th>Akcje</th>
+        </tr>
+        <tr class="filter-row">
+          <th><input id="tf-name" placeholder="Szukaj..." value="${esc(editFilter.name)}"></th>
+          <th><select id="tf-city"><option value="">Wszystkie</option>${Object.keys(CITIES).map(c=>`<option ${editFilter.city===c?'selected':''}>${c}</option>`).join('')}</select></th>
+          <th><input id="tf-address" placeholder="Szukaj..." value="${esc(editFilter.address)}"></th>
+          <th><input id="tf-capacity" placeholder="Szukaj..." value="${esc(editFilter.capacity)}"></th>
+          <th><input id="tf-cost" placeholder="Szukaj..." value="${esc(editFilter.cost)}"></th>
+          <th><input id="tf-costPerSpot" placeholder="Szukaj..." value="${esc(editFilter.costPerSpot)}"></th>
+          <th><select id="tf-status"><option value="">Wszystkie</option>${Object.entries(STATUS_LABEL).map(([k,v])=>`<option value="${k}" ${editFilter.status===k?'selected':''}>${v}</option>`).join('')}</select></th>
+          <th><select id="tf-skycash"><option value="">Wszystkie</option><option value="wlaczony" ${editFilter.skycash==='wlaczony'?'selected':''}>Włączony</option><option value="wylaczony" ${editFilter.skycash==='wylaczony'?'selected':''}>Wyłączony</option></select></th>
+          <th><input id="tf-contract" placeholder="Szukaj..." value="${esc(editFilter.contract)}"></th>
+          <th></th>
+        </tr>
+        <tbody id="t-body"></tbody>
+      </table>
+    </div>
+  `;
+  const bindText = (id, key) => document.getElementById(id).addEventListener('input', e=>{ editFilter[key]=e.target.value; renderTableBody(); });
+  const bindSelect = (id, key) => document.getElementById(id).addEventListener('change', e=>{ editFilter[key]=e.target.value; renderTableBody(); });
+  bindText('tf-name','name');
+  bindSelect('tf-city','city');
+  bindText('tf-address','address');
+  bindText('tf-capacity','capacity');
+  bindText('tf-cost','cost');
+  bindText('tf-costPerSpot','costPerSpot');
+  bindSelect('tf-status','status');
+  bindSelect('tf-skycash','skycash');
+  bindText('tf-contract','contract');
+  document.getElementById('t-clear-filters').addEventListener('click', ()=>{ editFilter = {...EMPTY_TABLE_FILTER}; renderTable(); });
+  document.getElementById('t-add').addEventListener('click', ()=>openParkingModal(null));
+  document.getElementById('t-export').addEventListener('click', exportExcel);
+  document.getElementById('t-export-full').addEventListener('click', exportExcelFull);
+  document.getElementById('t-import-excel').addEventListener('click', ()=> document.getElementById('excel-file-input').click());
+  renderTableBody();
+}
+function filteredParkings(){
+  return state.parkings.filter(p=>{
+    const perSpot = p.capacity>0 ? Math.round(Number(p.cost||0)/Number(p.capacity)) : 0;
+    if(editFilter.name && !(p.name||'').toLowerCase().includes(editFilter.name.toLowerCase())) return false;
+    if(editFilter.city && p.city!==editFilter.city) return false;
+    if(editFilter.address && !(p.address||'').toLowerCase().includes(editFilter.address.toLowerCase())) return false;
+    if(editFilter.capacity && !String(p.capacity||0).includes(editFilter.capacity)) return false;
+    if(editFilter.cost && !String(p.cost||0).includes(editFilter.cost)) return false;
+    if(editFilter.costPerSpot && !String(perSpot).includes(editFilter.costPerSpot)) return false;
+    if(editFilter.status && p.status!==editFilter.status) return false;
+    if(editFilter.skycash && (p.skycash||'wlaczony')!==editFilter.skycash) return false;
+    if(editFilter.contract && !(p.contractEnd||'').includes(editFilter.contract)) return false;
+    return true;
+  });
+}
+function renderTableBody(){
+  const body = document.getElementById('t-body');
+  const rows = filteredParkings();
+  if(!rows.length){ body.innerHTML = `<tr><td colspan="10"><div class="empty">Brak parkingów spełniających filtry. Dodaj pierwszy rekord.</div></td></tr>`; return; }
+  body.innerHTML = rows.map(p=>{
+    const perSpot = p.capacity>0 ? Math.round(Number(p.cost||0)/Number(p.capacity)) : 0;
+    const skyOn = (p.skycash||'wlaczony')==='wlaczony';
+    const completeIcon = p.complete
+      ? `<span class="complete-flag" title="Parking kompletny" style="color:var(--succ);">✅</span>`
+      : `<span class="complete-flag" title="Wymagana akcja" style="color:#c9860a;">⚠️</span>`;
+    return `<tr>
+      <td class="cell-wrap">${esc(p.name)}</td>
+      <td>${esc(p.city)}</td>
+      <td class="cell-wrap" style="color:var(--ts);">${esc(p.address||'')}</td>
+      <td>${p.capacity||0}</td>
+      <td>${Number(p.cost||0).toLocaleString('pl-PL')} zł</td>
+      <td>${perSpot? perSpot.toLocaleString('pl-PL')+' zł' : '—'}</td>
+      <td><span class="pill ${p.status}">${STATUS_LABEL[p.status]}</span></td>
+      <td><span class="pill ${skyOn?'skycash-on':'skycash-off'}">${skyOn?'Włączony':'Wyłączony'}</span></td>
+      <td style="color:var(--ts);">${p.contractEnd||'—'}</td>
+      <td>
+        <div class="row-actions">
+          ${completeIcon}
+          <button data-id="${p.id}" class="edit-btn">Edytuj</button>
+          <button data-id="${p.id}" class="details-btn">Szczegóły</button>
+          <button data-id="${p.id}" class="danger del-btn">Usuń</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+  body.querySelectorAll('.edit-btn').forEach(b=>b.addEventListener('click', ()=>openParkingModal(b.dataset.id)));
+  body.querySelectorAll('.details-btn').forEach(b=>b.addEventListener('click', ()=>openDetailsModal(b.dataset.id)));
+  body.querySelectorAll('.del-btn').forEach(b=>b.addEventListener('click', ()=>deleteParking(b.dataset.id)));
+}
+
+function renderCompleteBtn(btn, complete){
+  if(complete){
+    btn.textContent = '✅ Parking kompletny';
+    btn.style.background = 'var(--bgsucc)';
+    btn.style.borderColor = 'var(--bgsucc)';
+    btn.style.color = 'var(--succ)';
+    btn.title = 'Parking kompletny';
+  } else {
+    btn.textContent = '⚠️ Wymaga uzupełnienia';
+    btn.style.background = 'var(--bgwarn)';
+    btn.style.borderColor = 'var(--bgwarn)';
+    btn.style.color = 'var(--warn)';
+    btn.title = 'Wymagana akcja';
+  }
+}
+function setupCompleteToggle(btnId, hiddenId){
+  const btn = document.getElementById(btnId);
+  btn.addEventListener('click', ()=>{
+    const hidden = document.getElementById(hiddenId);
+    const newVal = !(hidden.value === 'true');
+    hidden.value = newVal.toString();
+    renderCompleteBtn(btn, newVal);
+  });
+}
+setupCompleteToggle('f-complete-btn', 'f-complete');
+setupCompleteToggle('dt-complete-btn', 'dt-complete');
+
+function openParkingModal(id, prefill){
+  const overlay = document.getElementById('parking-overlay');
+  const citySel = document.getElementById('f-city');
+  citySel.innerHTML = Object.keys(CITIES).map(c=>`<option>${c}</option>`).join('');
+  const p = id ? state.parkings.find(x=>x.id===id) : (prefill||{});
+  document.getElementById('parking-modal-title').textContent = id? 'Edytuj parking' : 'Dodaj parking';
+  document.getElementById('f-id').value = id||'';
+  document.getElementById('f-name').value = p.name||'';
+  document.getElementById('f-city').value = p.city||currentCity;
+  document.getElementById('f-status').value = p.status||'typowany';
+  document.getElementById('f-address').value = p.address||'';
+  document.getElementById('f-capacity').value = p.capacity||'';
+  document.getElementById('f-cost').value = p.cost||'';
+  document.getElementById('f-lat').value = (p.lat!==undefined && p.lat!==null)? p.lat : '';
+  document.getElementById('f-lng').value = (p.lng!==undefined && p.lng!==null)? p.lng : '';
+  document.getElementById('f-contract').value = p.contractEnd||'';
+  document.getElementById('f-skycash').value = p.skycash || 'wlaczony';
+  document.getElementById('f-complete').value = (!!p.complete).toString();
+  renderCompleteBtn(document.getElementById('f-complete-btn'), !!p.complete);
+  overlay.classList.add('show');
+}
+document.getElementById('f-cancel').addEventListener('click', ()=>{
+  document.getElementById('parking-overlay').classList.remove('show');
+});
+document.getElementById('f-save').addEventListener('click', async ()=>{
+  const id = document.getElementById('f-id').value;
+  const existing = id? state.parkings.find(x=>x.id===id) : null;
+  const rec = {
+    id: id || uid(),
+    name: document.getElementById('f-name').value.trim() || 'Bez nazwy',
+    city: document.getElementById('f-city').value,
+    status: document.getElementById('f-status').value,
+    address: document.getElementById('f-address').value.trim(),
+    capacity: Number(document.getElementById('f-capacity').value)||0,
+    cost: Number(document.getElementById('f-cost').value)||0,
+    lat: document.getElementById('f-lat').value? Number(document.getElementById('f-lat').value):null,
+    lng: document.getElementById('f-lng').value? Number(document.getElementById('f-lng').value):null,
+    contractEnd: document.getElementById('f-contract').value||'',
+    skycash: document.getElementById('f-skycash').value,
+    complete: document.getElementById('f-complete').value === 'true',
+    notes: existing? existing.notes : '',
+    description: existing? existing.description : '',
+    manager: existing? existing.manager : '',
+    contractId: existing? existing.contractId : '',
+    requiredAction: existing? existing.requiredAction : '',
+    photo: existing? existing.photo : null
+  };
+  const { error } = await supabaseClient.from('parkings').upsert(parkingToRow(rec));
+  if(error){ dbError('zapis parkingu', error); return; }
+  if(id){
+    const idx = state.parkings.findIndex(x=>x.id===id);
+    state.parkings[idx] = rec;
+  } else {
+    state.parkings.push(rec);
+  }
+  flashSaved();
+  document.getElementById('parking-overlay').classList.remove('show');
+  if(document.getElementById('view-table').classList.contains('active')) renderTable();
+  if(document.getElementById('view-dashboard').classList.contains('active')) renderDashboard();
+  if(document.getElementById('view-map').classList.contains('active') && map){ plotParkingMarkers(); renderCityParkingsPanel(); }
+});
+
+/* --- parking details card: full overview (photo, facts, description, manager, contract, notes, completeness) --- */
+function renderDetailsQuickFacts(p){
+  const perSpot = p.capacity>0 ? Math.round(Number(p.cost||0)/Number(p.capacity)) : 0;
+  const skyOn = (p.skycash||'wlaczony')==='wlaczony';
+  const rows = [
+    ['Miasto', esc(p.city)],
+    ['Adres', esc(p.address||'—')],
+    ['Status', `<span class="pill ${p.status}">${STATUS_LABEL[p.status]}</span>`],
+    ['SkyCash', `<span class="pill ${skyOn?'skycash-on':'skycash-off'}">${skyOn?'Włączony':'Wyłączony'}</span>`],
+    ['Miejsca', p.capacity||0],
+    ['Koszt / mc', Number(p.cost||0).toLocaleString('pl-PL')+' zł'],
+    ['Koszt / miejsce', perSpot? perSpot.toLocaleString('pl-PL')+' zł':'—'],
+    ['Umowa do', p.contractEnd||'—'],
+    ['Współrzędne', (p.lat!=null && p.lng!=null)? `${p.lat}, ${p.lng}` : '—']
+  ];
+  return rows.map(([label,val])=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px solid var(--bd);"><span style="color:var(--ts);">${label}</span><span>${val}</span></div>`).join('');
+}
+function openDetailsModal(id){
+  const p = state.parkings.find(x=>x.id===id);
+  if(!p) return;
+  document.getElementById('details-title').textContent = p.name;
+  document.getElementById('details-subtitle').textContent = p.city + (p.address? ' · ' + p.address : '');
+  document.getElementById('dt-id').value = id;
+  document.getElementById('dt-description').value = p.description || '';
+  document.getElementById('dt-manager').value = p.manager || '';
+  document.getElementById('dt-contract-id').value = p.contractId || '';
+  document.getElementById('dt-notes').value = p.notes || '';
+  document.getElementById('dt-required-action').value = p.requiredAction || '';
+  document.getElementById('dt-complete').value = (!!p.complete).toString();
+  renderCompleteBtn(document.getElementById('dt-complete-btn'), !!p.complete);
+  document.getElementById('dt-quick-facts').innerHTML = renderDetailsQuickFacts(p);
+  const preview = document.getElementById('dt-photo-preview');
+  preview.innerHTML = p.photo ? `<img src="${p.photo}" style="width:100%;height:100%;object-fit:cover;">` : `<span style="color:var(--tm);font-size:11px;">Brak zdjęcia</span>`;
+  delete preview.dataset.newPhoto;
+  document.getElementById('dt-photo-input').value = '';
+  document.getElementById('details-overlay').classList.add('show');
+}
+document.getElementById('dt-photo-input').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    const preview = document.getElementById('dt-photo-preview');
+    preview.innerHTML = `<img src="${reader.result}" style="width:100%;height:100%;object-fit:cover;">`;
+    preview.dataset.newPhoto = reader.result;
+  };
+  reader.readAsDataURL(file);
+});
+document.getElementById('dt-cancel').addEventListener('click', ()=>{
+  document.getElementById('details-overlay').classList.remove('show');
+});
+document.getElementById('dt-edit').addEventListener('click', ()=>{
+  const id = document.getElementById('dt-id').value;
+  document.getElementById('details-overlay').classList.remove('show');
+  openParkingModal(id);
+});
+document.getElementById('dt-save').addEventListener('click', async ()=>{
+  const id = document.getElementById('dt-id').value;
+  const p = state.parkings.find(x=>x.id===id);
+  if(!p) return;
+  p.description = document.getElementById('dt-description').value.trim();
+  p.manager = document.getElementById('dt-manager').value.trim();
+  p.contractId = document.getElementById('dt-contract-id').value.trim();
+  p.notes = document.getElementById('dt-notes').value.trim();
+  p.requiredAction = document.getElementById('dt-required-action').value.trim();
+  p.complete = document.getElementById('dt-complete').value === 'true';
+  const preview = document.getElementById('dt-photo-preview');
+  if(preview.dataset.newPhoto) p.photo = preview.dataset.newPhoto;
+  const { error } = await supabaseClient.from('parkings').upsert(parkingToRow(p));
+  if(error){
+    alert('Nie udało się zapisać — zdjęcie może być za duże albo brak połączenia z bazą. Spróbuj mniejszego pliku. (' + error.message + ')');
+    return;
+  }
+  flashSaved();
+  delete preview.dataset.newPhoto;
+  document.getElementById('details-overlay').classList.remove('show');
+  if(document.getElementById('view-table').classList.contains('active')) renderTableBody();
+  if(document.getElementById('view-map').classList.contains('active') && map) renderCityParkingsPanel();
+  if(document.getElementById('view-dashboard').classList.contains('active')) renderDashboard();
+});
+
+async function deleteParking(id){
+  const p = state.parkings.find(x=>x.id===id);
+  if(!confirm(`Czy na pewno usunąć parking "${p? p.name : ''}"? Tej operacji nie można cofnąć.`)) return;
+  const { error } = await supabaseClient.from('parkings').delete().eq('id', id);
+  if(error){ dbError('usuwanie parkingu', error); return; }
+  state.parkings = state.parkings.filter(x=>x.id!==id);
+  flashSaved();
+  if(document.getElementById('view-table').classList.contains('active')) renderTableBody();
+  if(document.getElementById('view-map').classList.contains('active') && map){ plotParkingMarkers(); renderCityParkingsPanel(); }
+  if(document.getElementById('view-dashboard').classList.contains('active')) renderDashboard();
+}
+function exportExcel(){
+  const rows = state.parkings.map(p=>({
+    'Nazwa parkingu': p.name, 'Miasto': p.city, 'Adres': p.address,
+    'Liczba miejsc': p.capacity, 'Koszt miesięczny (zł)': p.cost,
+    'Koszt na miejsce (zł)': p.capacity? Math.round(p.cost/p.capacity):0,
+    'Status': STATUS_LABEL[p.status], 'SkyCash': (p.skycash||'wlaczony')==='wlaczony'?'Włączony':'Wyłączony',
+    'Umowa do': p.contractEnd, 'ID umowy': p.contractId||'', 'Zarządca': p.manager||'',
+    'Szerokość geo.': p.lat, 'Długość geo.': p.lng, 'Opis': p.description||'', 'Uwagi': p.notes
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Parkingi');
+  XLSX.writeFile(wb, 'baza_parkingow_spoty.xlsx');
+}
+function exportExcelFull(){
+  const rows = state.parkings.map(p=>({
+    'Nazwa parkingu': p.name, 'Miasto': p.city, 'Adres': p.address,
+    'Liczba miejsc': p.capacity, 'Koszt miesięczny (zł)': p.cost,
+    'Koszt na miejsce (zł)': p.capacity? Math.round(p.cost/p.capacity):0,
+    'Status': STATUS_LABEL[p.status], 'SkyCash': (p.skycash||'wlaczony')==='wlaczony'?'Włączony':'Wyłączony',
+    'Kompletność': p.complete? 'Parking kompletny' : 'Wymagana akcja',
+    'Wymagane działania': p.requiredAction||'',
+    'Umowa do': p.contractEnd||'', 'ID umowy': p.contractId||'', 'Zarządca': p.manager||'',
+    'Szerokość geo.': p.lat, 'Długość geo.': p.lng,
+    'Opis': p.description||'', 'Uwagi': p.notes||'',
+    'Zdjęcie dodane': p.photo? 'Tak' : 'Nie'
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Parkingi - pełne dane');
+  XLSX.writeFile(wb, 'baza_parkingow_pelne_dane.xlsx');
+}
+
+/* --- import z Excela (odtwarza wszystko z "Baza parkingów", w tym punkty na mapie ze współrzędnych) --- */
+const STATUS_LABEL_REVERSE = Object.fromEntries(Object.entries(STATUS_LABEL).map(([k,v])=>[v,k]));
+function excelDateToStr(v){
+  if(v===null || v===undefined || v==='') return '';
+  if(v instanceof Date) return toDateStr(v);
+  if(typeof v === 'number'){
+    const d = new Date(Math.round((v - 25569) * 86400 * 1000));
+    return toDateStr(d);
+  }
+  return String(v).trim();
+}
+function parseImportedRow(row){
+  const cityRaw = (row['Miasto']||'').toString().trim();
+  const cityMatch = Object.keys(CITIES).find(c=>c.toLowerCase()===cityRaw.toLowerCase());
+  const statusLabel = (row['Status']||'').toString().trim();
+  const skycashLabel = (row['SkyCash']||'').toString().trim();
+  const completeLabel = (row['Kompletność']||'').toString().trim();
+  const latRaw = row['Szerokość geo.'];
+  const lngRaw = row['Długość geo.'];
+  return {
+    id: uid(),
+    name: (row['Nazwa parkingu']||row['Lokalizacja']||'Bez nazwy').toString().trim(),
+    city: cityMatch || cityRaw || currentCity,
+    address: (row['Adres']||'').toString().trim(),
+    capacity: Number(row['Liczba miejsc'])||0,
+    cost: Number(row['Koszt miesięczny (zł)'])||0,
+    status: STATUS_LABEL_REVERSE[statusLabel] || 'typowany',
+    skycash: skycashLabel==='Wyłączony' ? 'wylaczony' : 'wlaczony',
+    complete: completeLabel==='Parking kompletny',
+    requiredAction: (row['Wymagane działania']||'').toString().trim(),
+    contractEnd: excelDateToStr(row['Umowa do']),
+    contractId: (row['ID umowy']||'').toString().trim(),
+    manager: (row['Zarządca']||'').toString().trim(),
+    lat: (latRaw!==undefined && latRaw!==null && latRaw!=='') ? parseFloat(latRaw) : null,
+    lng: (lngRaw!==undefined && lngRaw!==null && lngRaw!=='') ? parseFloat(lngRaw) : null,
+    description: (row['Opis']||'').toString().trim(),
+    notes: (row['Uwagi']||'').toString().trim(),
+    photo: null
+  };
+}
+document.getElementById('excel-file-input').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async (evt)=>{
+    try{
+      const data = new Uint8Array(evt.target.result);
+      const wb = XLSX.read(data, {type:'array', cellDates:true});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(sheet, {defval:''});
+      if(!json.length){ alert('Plik nie zawiera żadnych wierszy.'); e.target.value=''; return; }
+      const imported = json.map(parseImportedRow);
+      const withCoords = imported.filter(p=>p.lat!=null && p.lng!=null).length;
+      const doReplace = confirm(
+        `Znaleziono ${imported.length} parkingów w pliku (${withCoords} z nich ma współrzędne i pojawi się na mapie).\n\n`+
+        `OK = ZASTĄP obecną bazę tymi danymi (usunie to, co masz teraz w "Baza parkingów").\n`+
+        `Anuluj = DODAJ je do obecnej bazy, bez usuwania niczego.`
+      );
+      if(doReplace){
+        const { error: delError } = await supabaseClient.from('parkings').delete().neq('id', '');
+        if(delError){ dbError('czyszczenie bazy przed importem', delError); return; }
+        state.parkings = imported;
+      } else {
+        state.parkings = state.parkings.concat(imported);
+      }
+      const { error: insError } = await supabaseClient.from('parkings').insert(imported.map(parkingToRow));
+      if(insError){ dbError('import parkingów', insError); return; }
+      flashSaved();
+      if(document.getElementById('view-table').classList.contains('active')) renderTable();
+      if(document.getElementById('view-dashboard').classList.contains('active')) renderDashboard();
+      if(document.getElementById('view-map').classList.contains('active') && map){ plotParkingMarkers(); renderCityParkingsPanel(); }
+      alert(`Zaimportowano ${imported.length} parkingów. Uwaga: zdjęcia nie są zapisywane w Excelu — jeśli jakiś parking miał zdjęcie, trzeba dodać je ponownie w karcie "Szczegóły".`);
+    }catch(err){
+      console.error(err);
+      alert('Nie udało się wczytać pliku. Sprawdź, czy to poprawny plik .xlsx wyeksportowany z tego narzędzia.');
+    }
+    e.target.value = '';
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+/* ---------- MAP (Leaflet, no server / no API key needed) ---------- */
+let map = null;
+let zonePolysOnMap = [];
+let markersOnMap = [];
+let markersById = {};
+let activeZoneForAction = null;
+let zoneVisibility = {}; // zoneId -> bool, default true
+let exportSelectMode = false;
+let exportSelectedIds = new Set();
+
+// unified interactive polygon editor (used for both drawing new zones and editing existing ones)
+let polyMode = null; // null | 'draw' | 'edit'
+let polyType = null;
+let polyEditingZoneId = null;
+let polyVertexMarkers = [];
+let polyMidMarkers = [];
+let polyPreviewLayer = null;
+
+function vertexIcon(){
+  return L.divIcon({className:'vertex-handle', iconSize:[14,14], iconAnchor:[7,7]});
+}
+function midIcon(){
+  return L.divIcon({className:'vertex-handle mid', iconSize:[10,10], iconAnchor:[5,5]});
+}
+
+function initMapView(){
+  const el = document.getElementById('view-map');
+  if(!el.dataset.built){
+    el.innerHTML = `
+      <div id="map-fullscreen-wrap">
+        <div class="toolbar">
+          <div class="toolbar-left" id="m-city-tiles"></div>
+          <div class="toolbar-left" id="m-draw-controls"></div>
+        </div>
+        <p class="hint" id="m-hint" style="margin:0 0 10px;"></p>
+        <div style="display:flex;gap:16px;align-items:flex-start;">
+          <div style="flex:1;min-width:0;"><div id="map"></div></div>
+          <div class="card" id="zones-panel" style="width:210px;display:none;flex-shrink:0;">
+            <p class="section-title" style="margin:0 0 10px;">Widoczność stref</p>
+            <div id="zones-panel-list"></div>
+          </div>
+        </div>
+      </div>
+      <div class="legend" id="m-legend"></div>
+      <div class="city-parkings-wrap">
+        <div>
+          <p class="section-title">Parkingi w mieście <span id="cpp-city-name"></span></p>
+          <div class="card" style="padding:0;overflow-x:auto;" id="cpp-table-wrap"></div>
+        </div>
+        <div>
+          <p class="section-title">Podsumowanie</p>
+          <div class="card" id="cpp-summary"></div>
+        </div>
+      </div>
+    `;
+    el.dataset.built = '1';
+    const tilesWrap = document.getElementById('m-city-tiles');
+    tilesWrap.innerHTML = Object.keys(CITIES).map(c=>`<button class="city-tile-btn${c===currentCity?' active':''}" data-city="${c}">${c}</button>`).join('');
+    tilesWrap.querySelectorAll('.city-tile-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        currentCity = btn.dataset.city;
+        tilesWrap.querySelectorAll('.city-tile-btn').forEach(b=>b.classList.toggle('active', b.dataset.city===currentCity));
+        if(map){ cancelAnyMapAction(); map.setView(CITIES[currentCity], 12); buildOverlaysForCity(); }
+      });
+    });
+    renderMapControls();
+    renderLegend();
+    document.getElementById('cpp-table-wrap').addEventListener('click', function(e){
+      if(e.target.closest('button')) return;
+      const tr = e.target.closest('tr[data-id]');
+      if(!tr) return;
+      showParkingOnMap(tr.dataset.id);
+    });
+  }
+  if(!map){ buildMap(); }
+  else { setTimeout(()=>map.invalidateSize(), 50); renderCityParkingsPanel(); }
+}
+
+function buildMap(){
+  map = L.map('map').setView(CITIES[currentCity], 12);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+    maxZoom: 20,
+    subdomains: 'abcd'
+  }).addTo(map);
+
+  map.on('click', function(e){
+    if(polyMode==='draw'){ addPolyVertex(e.latlng); return; }
+    if(polyMode==='edit') return;
+    if(exportSelectMode) return;
+    openParkingModal(null, {city: currentCity, lat: Number(e.latlng.lat.toFixed(5)), lng: Number(e.latlng.lng.toFixed(5))});
+  });
+
+  buildOverlaysForCity();
+}
+
+function setDrawingCursor(on){
+  const mapEl = document.getElementById('map');
+  if(mapEl) mapEl.classList.toggle('drawing-cursor', !!on);
+}
+function toggleMapFullscreen(){
+  const wrap = document.getElementById('map-fullscreen-wrap');
+  if(!wrap) return;
+  const isMax = wrap.classList.toggle('map-maximized');
+  document.body.classList.toggle('map-maximized-active', isMax);
+  const btn = document.getElementById('m-fullscreen');
+  if(btn) btn.textContent = isMax ? '✕ Zamknij pełny ekran' : '⛶ Pełny ekran';
+  if(map) setTimeout(()=>map.invalidateSize(), 60);
+  if(isMax){
+    document.addEventListener('keydown', escCloseFullscreen);
+  } else {
+    document.removeEventListener('keydown', escCloseFullscreen);
+  }
+}
+function escCloseFullscreen(e){
+  if(e.key === 'Escape') toggleMapFullscreen();
+}
+
+function cancelAnyMapAction(){
+  if(polyMode) cancelPoly();
+}
+
+/* --- controls panel: switches between default / drawing / editing --- */
+function renderMapControls(){
+  const wrap = document.getElementById('m-draw-controls');
+  const hint = document.getElementById('m-hint');
+  if(polyMode==='draw'){
+    wrap.innerHTML = `
+      <span class="hint">Punkty: ${polyVertexMarkers.length}</span>
+      <button id="m-draw-finish" class="primary" ${polyVertexMarkers.length<3?'disabled':''}>Zakończ strefę</button>
+      <button id="m-draw-cancel">Anuluj</button>
+    `;
+    hint.textContent = 'Lewy klik na mapie dodaje wierzchołek (min. 3). Lewy klik na punkcie i przeciągnięcie zmienia jego pozycję. Prawy klik na punkcie usuwa go. Klik na małym punkcie na krawędzi dodaje tam nowy wierzchołek.';
+    document.getElementById('m-draw-finish').addEventListener('click', finishPoly);
+    document.getElementById('m-draw-cancel').addEventListener('click', cancelPoly);
+  } else if(polyMode==='edit'){
+    wrap.innerHTML = `
+      <span class="hint">Tryb edycji kształtu</span>
+      <button id="m-edit-save" class="primary">Zapisz zmiany</button>
+      <button id="m-edit-cancel">Anuluj edycję</button>
+    `;
+    hint.textContent = 'Złap punkt i przeciągnij, żeby zmienić kształt. Prawy klik na punkcie go usuwa. Klik na małym punkcie na krawędzi dodaje nowy wierzchołek (więcej załamań).';
+    document.getElementById('m-edit-save').addEventListener('click', finishPoly);
+    document.getElementById('m-edit-cancel').addEventListener('click', cancelPoly);
+  } else if(exportSelectMode){
+    wrap.innerHTML = `
+      <span class="hint">Zaznaczono: ${exportSelectedIds.size}</span>
+      <button id="m-export-confirm" class="primary" ${exportSelectedIds.size===0?'disabled':''}>Eksportuj zaznaczone (KML)</button>
+      <button id="m-export-cancel">Anuluj</button>
+    `;
+    hint.textContent = 'Kliknij strefy na mapie, które chcesz uwzględnić w eksporcie (możesz przełączać miasta, zaznaczenie zostanie zapamiętane).';
+    document.getElementById('m-export-confirm').addEventListener('click', ()=>{
+      exportZonesKML(true);
+      exportSelectMode = false;
+      exportSelectedIds.clear();
+      buildOverlaysForCity();
+      renderMapControls();
+    });
+    document.getElementById('m-export-cancel').addEventListener('click', ()=>{
+      exportSelectMode = false;
+      exportSelectedIds.clear();
+      buildOverlaysForCity();
+      renderMapControls();
+    });
+  } else {
+    const wrapEl = document.getElementById('map-fullscreen-wrap');
+    const isMax = wrapEl && wrapEl.classList.contains('map-maximized');
+    wrap.innerHTML = `
+      <button id="m-draw-toggle">✏️ Rysuj strefę</button>
+      <button id="m-add">+ Dodaj parking w tym mieście</button>
+      <button id="m-zones-toggle">📍 Pokaż strefy</button>
+      <button id="m-export-kml">⬇️ Eksportuj strefy (KML)</button>
+      <button id="m-import-kml">⬆️ Importuj KML</button>
+      <button id="m-fullscreen">${isMax? '✕ Zamknij pełny ekran' : '⛶ Pełny ekran'}</button>
+    `;
+    hint.textContent = 'Kliknij dowolny punkt mapy, żeby dodać tam parking. Kliknij "Rysuj strefę", żeby zaznaczyć obszar. Kliknij istniejącą strefę, żeby ją zmienić lub usunąć.';
+    document.getElementById('m-draw-toggle').addEventListener('click', ()=>{
+      document.getElementById('zone-overlay').classList.add('show');
+    });
+    document.getElementById('m-add').addEventListener('click', ()=>openParkingModal(null, {city:currentCity}));
+    document.getElementById('m-zones-toggle').addEventListener('click', ()=>{
+      const panel = document.getElementById('zones-panel');
+      panel.style.display = (panel.style.display==='none' || !panel.style.display) ? 'block' : 'none';
+    });
+    document.getElementById('m-fullscreen').addEventListener('click', toggleMapFullscreen);
+    document.getElementById('m-export-kml').addEventListener('click', ()=>{
+      exportSelectMode = true;
+      exportSelectedIds.clear();
+      buildOverlaysForCity();
+      renderMapControls();
+    });
+    document.getElementById('m-import-kml').addEventListener('click', ()=>{
+      document.getElementById('kml-file-input').click();
+    });
+  }
+}
+
+/* --- unified polygon editor: drawing a NEW zone or editing an existing one --- */
+document.querySelectorAll('#zone-overlay .zone-type-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    startPolyDraw(btn.dataset.zone);
+    document.getElementById('zone-overlay').classList.remove('show');
+  });
+});
+document.getElementById('zone-cancel').addEventListener('click', ()=>{
+  document.getElementById('zone-overlay').classList.remove('show');
+});
+
+function startPolyDraw(type){
+  polyMode = 'draw';
+  polyType = type;
+  polyEditingZoneId = null;
+  clearPolyLayers();
+  setDrawingCursor(true);
+  renderMapControls();
+}
+function startPolyEdit(zone){
+  polyMode = 'edit';
+  polyType = zone.type;
+  polyEditingZoneId = zone.id;
+  clearPolyLayers();
+  const entry = zonePolysOnMap.find(zz=>zz.id===zone.id);
+  if(entry) map.removeLayer(entry.layer);
+  zone.latlngs.forEach(([lat,lng])=> addPolyVertex(L.latLng(lat,lng), false));
+  redrawPoly();
+  setDrawingCursor(true);
+  renderMapControls();
+}
+function cancelPoly(){
+  const wasEdit = polyMode==='edit';
+  polyMode = null; polyType = null; polyEditingZoneId = null;
+  clearPolyLayers();
+  setDrawingCursor(false);
+  renderMapControls();
+  if(wasEdit) buildOverlaysForCity();
+}
+async function finishPoly(){
+  if(polyVertexMarkers.length<3) return;
+  const latlngs = polyVertexMarkers.map(m=>{ const ll=m.getLatLng(); return [ll.lat, ll.lng]; });
+  if(polyMode==='draw'){
+    const zoneId = uid();
+    const { error } = await supabaseClient.from('zones').insert({id:zoneId, city:currentCity, type:polyType, latlngs});
+    if(error){ dbError('zapis strefy', error); return; }
+    if(!state.zones[currentCity]) state.zones[currentCity] = [];
+    state.zones[currentCity].push({id:zoneId, type:polyType, latlngs});
+    flashSaved();
+  } else if(polyMode==='edit'){
+    const z = (state.zones[currentCity]||[]).find(zz=>zz.id===polyEditingZoneId);
+    if(z){
+      const { error } = await supabaseClient.from('zones').update({latlngs}).eq('id', polyEditingZoneId);
+      if(error){ dbError('aktualizacja strefy', error); return; }
+      z.latlngs = latlngs;
+      flashSaved();
+    }
+  }
+  polyMode = null; polyType = null; polyEditingZoneId = null;
+  clearPolyLayers();
+  setDrawingCursor(false);
+  renderMapControls();
+  buildOverlaysForCity();
+}
+function attachVertexEvents(marker){
+  marker.on('drag', redrawPoly);
+  marker.on('dragend', redrawPoly);
+  marker.on('contextmenu', function(e){
+    L.DomEvent.preventDefault(e);
+    L.DomEvent.stopPropagation(e);
+    removePolyVertex(marker);
+  });
+}
+function removePolyVertex(marker){
+  if(polyVertexMarkers.length<=3){ alert('Strefa musi mieć co najmniej 3 punkty.'); return; }
+  const idx = polyVertexMarkers.indexOf(marker);
+  if(idx===-1) return;
+  map.removeLayer(marker);
+  polyVertexMarkers.splice(idx,1);
+  redrawPoly();
+}
+function addPolyVertex(latlng, redraw){
+  const marker = L.marker(latlng, {draggable:true, icon: vertexIcon()}).addTo(map);
+  attachVertexEvents(marker);
+  polyVertexMarkers.push(marker);
+  if(redraw!==false) redrawPoly();
+}
+function insertPolyVertexAt(index, latlng){
+  const marker = L.marker(latlng, {draggable:true, icon: vertexIcon()}).addTo(map);
+  attachVertexEvents(marker);
+  polyVertexMarkers.splice(index, 0, marker);
+  redrawPoly();
+}
+function redrawPoly(){
+  const latlngs = polyVertexMarkers.map(m=>m.getLatLng());
+  if(latlngs.length>=2){
+    const style = ZONE_STYLES[polyType];
+    if(!polyPreviewLayer){
+      polyPreviewLayer = L.polygon(latlngs, {color: style.color, weight:2, dashArray: latlngs.length<3?'5 5':null, fillOpacity:0.12}).addTo(map);
+    } else {
+      polyPreviewLayer.setLatLngs(latlngs);
+      polyPreviewLayer.setStyle({dashArray: latlngs.length<3?'5 5':null});
+    }
+  }
+  rebuildMidMarkers(latlngs);
+  renderMapControls();
+}
+function rebuildMidMarkers(latlngs){
+  polyMidMarkers.forEach(m=>map.removeLayer(m));
+  polyMidMarkers = [];
+  if(latlngs.length<3) return; // need a closed shape (3+ points) for edge-midpoints to make sense
+  for(let i=0;i<latlngs.length;i++){
+    const a = latlngs[i];
+    const b = latlngs[(i+1)%latlngs.length];
+    const mid = L.latLng((a.lat+b.lat)/2, (a.lng+b.lng)/2);
+    const midMarker = L.marker(mid, {icon: midIcon()}).addTo(map);
+    const insertIndex = i+1;
+    midMarker.on('click', function(e){
+      L.DomEvent.stopPropagation(e);
+      insertPolyVertexAt(insertIndex, midMarker.getLatLng());
+    });
+    polyMidMarkers.push(midMarker);
+  }
+}
+function clearPolyLayers(){
+  polyVertexMarkers.forEach(m=>map.removeLayer(m));
+  polyVertexMarkers = [];
+  polyMidMarkers.forEach(m=>map.removeLayer(m));
+  polyMidMarkers = [];
+  if(polyPreviewLayer){ map.removeLayer(polyPreviewLayer); polyPreviewLayer=null; }
+}
+
+/* --- clicking an existing zone: modify or delete --- */
+document.getElementById('za-modify').addEventListener('click', ()=>{
+  document.getElementById('zone-action-overlay').classList.remove('show');
+  if(activeZoneForAction) startPolyEdit(activeZoneForAction);
+  activeZoneForAction = null;
+});
+document.getElementById('za-add-excluded').addEventListener('click', async ()=>{
+  document.getElementById('zone-action-overlay').classList.remove('show');
+  if(activeZoneForAction){
+    const { error } = await supabaseClient.from('zones').update({type:'wykluczona'}).eq('id', activeZoneForAction.id);
+    if(error){ dbError('aktualizacja strefy', error); activeZoneForAction = null; return; }
+    activeZoneForAction.type = 'wykluczona';
+    flashSaved();
+    buildOverlaysForCity();
+  }
+  activeZoneForAction = null;
+});
+document.getElementById('za-delete').addEventListener('click', async ()=>{
+  document.getElementById('zone-action-overlay').classList.remove('show');
+  if(activeZoneForAction){
+    const { error } = await supabaseClient.from('zones').delete().eq('id', activeZoneForAction.id);
+    if(error){ dbError('usuwanie strefy', error); activeZoneForAction = null; return; }
+    state.zones[currentCity] = (state.zones[currentCity]||[]).filter(zz=>zz.id!==activeZoneForAction.id);
+    flashSaved();
+    buildOverlaysForCity();
+  }
+  activeZoneForAction = null;
+});
+document.getElementById('za-cancel').addEventListener('click', ()=>{
+  document.getElementById('zone-action-overlay').classList.remove('show');
+  activeZoneForAction = null;
+});
+
+/* --- overlays (saved zones + parking markers) --- */
+function buildOverlaysForCity(){
+  zonePolysOnMap.forEach(z=>map.removeLayer(z.layer));
+  zonePolysOnMap = [];
+  (state.zones[currentCity]||[]).forEach(z=>{
+    const style = ZONE_STYLES[z.type];
+    const visible = zoneVisibility[z.id] !== false;
+    const selected = exportSelectMode && exportSelectedIds.has(z.id);
+    const layer = L.polygon(z.latlngs, {color:style.color, fillColor:style.fillColor, fillOpacity: selected?0.35:0.15, weight: selected?5:2});
+    if(visible) layer.addTo(map);
+    layer.on('click', function(e){
+      if(polyMode) return;
+      L.DomEvent.stopPropagation(e);
+      if(exportSelectMode){
+        if(exportSelectedIds.has(z.id)) exportSelectedIds.delete(z.id); else exportSelectedIds.add(z.id);
+        buildOverlaysForCity();
+        renderMapControls();
+        return;
+      }
+      activeZoneForAction = z;
+      document.getElementById('zone-action-title').textContent = style.label;
+      document.getElementById('za-add-excluded').style.display = (z.type==='proponowana') ? 'block' : 'none';
+      document.getElementById('zone-action-overlay').classList.add('show');
+    });
+    zonePolysOnMap.push({id:z.id, layer});
+  });
+  renderZonesPanel();
+  plotParkingMarkers();
+  renderCityParkingsPanel();
+}
+function renderZonesPanel(){
+  const panel = document.getElementById('zones-panel-list');
+  if(!panel) return;
+  const zones = state.zones[currentCity] || [];
+  if(!zones.length){ panel.innerHTML = `<p class="hint">Brak stref w tym mieście.</p>`; return; }
+  panel.innerHTML = zones.map(z=>{
+    const style = ZONE_STYLES[z.type];
+    const checked = zoneVisibility[z.id] !== false;
+    return `<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px;cursor:pointer;">
+      <input type="checkbox" class="zone-vis-cb" data-zone-id="${z.id}" ${checked?'checked':''}>
+      <span class="sq" style="background:${style.color};display:inline-block;width:10px;height:10px;border-radius:2px;"></span>${style.label}
+    </label>`;
+  }).join('');
+  panel.querySelectorAll('.zone-vis-cb').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      const id = cb.dataset.zoneId;
+      zoneVisibility[id] = cb.checked;
+      const entry = zonePolysOnMap.find(zz=>zz.id===id);
+      if(entry){
+        if(cb.checked) entry.layer.addTo(map);
+        else map.removeLayer(entry.layer);
+      }
+    });
+  });
+}
+function exportZonesKML(onlySelected){
+  let folders = '';
+  Object.keys(state.zones).forEach(city=>{
+    let zones = state.zones[city] || [];
+    if(onlySelected) zones = zones.filter(z=>exportSelectedIds.has(z.id));
+    if(!zones.length) return;
+    let placemarks = '';
+    zones.forEach(z=>{
+      const style = ZONE_STYLES[z.type];
+      const coords = z.latlngs.map(([lat,lng])=>`${lng},${lat},0`).join(' ');
+      const first = z.latlngs[0];
+      placemarks += `
+    <Placemark>
+      <name>${escXml(style.label)}</name>
+      <description>${escXml(city)}</description>
+      <Style><LineStyle><color>${kmlColor(style.color)}</color><width>2</width></LineStyle><PolyStyle><color>${kmlColor(style.color,0x4d)}</color></PolyStyle></Style>
+      <Polygon><outerBoundaryIs><LinearRing><coordinates>${coords} ${first[1]},${first[0]},0</coordinates></LinearRing></outerBoundaryIs></Polygon>
+    </Placemark>`;
+    });
+    folders += `
+  <Folder><name>${escXml(city)}</name>${placemarks}
+  </Folder>`;
+  });
+  if(!folders){ alert('Brak stref do eksportu.'); return; }
+  const kml = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+<name>Traficar Spot - strefy</name>
+${folders}
+</Document>
+</kml>`;
+  const blob = new Blob([kml], {type:'application/vnd.google-earth.kml+xml'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'strefy_traficar.kml';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function escXml(s){ return (s||'').toString().replace(/[<>&'"]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&apos;','"':'&quot;'}[c])); }
+function kmlColor(hex, alphaOverride){
+  hex = hex.replace('#','');
+  const r = hex.substring(0,2), g = hex.substring(2,4), b = hex.substring(4,6);
+  const a = alphaOverride!==undefined ? alphaOverride.toString(16).padStart(2,'0') : 'ff';
+  return `${a}${b}${g}${r}`;
+}
+
+/* --- KML import --- */
+let pendingKmlShapes = [];
+function parseKML(text){
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  if(doc.getElementsByTagName('parsererror').length) return [];
+  const placemarks = Array.from(doc.getElementsByTagName('Placemark'));
+  const shapes = [];
+  placemarks.forEach((pm, pi)=>{
+    const nameEl = pm.getElementsByTagName('name')[0];
+    const baseName = nameEl && nameEl.textContent.trim() ? nameEl.textContent.trim() : ('Strefa ' + (pi+1));
+    // getElementsByTagName finds ALL Polygon descendants, whether the Placemark
+    // has a single <Polygon> or a <MultiGeometry> with several <Polygon> parts
+    // (this is how Google My Maps exports zones made of multiple disjoint pieces).
+    const polygons = Array.from(pm.getElementsByTagName('Polygon'));
+    polygons.forEach((poly, qi)=>{
+      const outer = poly.getElementsByTagName('outerBoundaryIs')[0];
+      const ring = outer ? outer.getElementsByTagName('LinearRing')[0] : poly.getElementsByTagName('LinearRing')[0];
+      const coordsEl = ring ? ring.getElementsByTagName('coordinates')[0] : poly.getElementsByTagName('coordinates')[0];
+      if(!coordsEl) return;
+      const raw = coordsEl.textContent.trim().split(/\s+/);
+      let latlngs = raw.map(pair=>{
+        const parts = pair.split(',');
+        const lng = parseFloat(parts[0]), lat = parseFloat(parts[1]);
+        return [lat, lng];
+      }).filter(p=>!isNaN(p[0]) && !isNaN(p[1]));
+      if(latlngs.length>1){
+        const first = latlngs[0], last = latlngs[latlngs.length-1];
+        if(first[0]===last[0] && first[1]===last[1]) latlngs.pop();
+      }
+      if(latlngs.length>=3){
+        const label = polygons.length>1 ? `${baseName} (część ${qi+1}/${polygons.length})` : baseName;
+        shapes.push({name: label, latlngs});
+      }
+    });
+  });
+  return shapes;
+}
+document.getElementById('kml-file-input').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    pendingKmlShapes = parseKML(reader.result);
+    if(!pendingKmlShapes.length){ alert('Nie znaleziono żadnych stref (wielokątów) w tym pliku KML.'); return; }
+    document.getElementById('kml-import-city').textContent = currentCity;
+    document.getElementById('kml-import-list').innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;padding:0 0 10px;border-bottom:1px solid var(--bd);margin-bottom:8px;">
+        <span style="flex:1;font-size:13px;color:var(--ts);">Ustaw typ dla wszystkich naraz:</span>
+        <select id="kml-import-type-all">
+          <option value="">— wybierz —</option>
+          <option value="traficar">Traficar</option>
+          <option value="spp">SPP</option>
+          <option value="proponowana">Proponowana</option>
+          <option value="wykluczona">Wykluczona</option>
+        </select>
+      </div>
+    ` + pendingKmlShapes.map((s,i)=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bd);">
+        <span style="flex:1;font-size:13px;">${esc(s.name)}</span>
+        <select class="kml-import-type" data-idx="${i}">
+          <option value="traficar">Traficar</option>
+          <option value="spp">SPP</option>
+          <option value="proponowana">Proponowana</option>
+          <option value="wykluczona">Wykluczona</option>
+        </select>
+      </div>
+    `).join('');
+    document.getElementById('kml-import-type-all').addEventListener('change', (ev)=>{
+      if(!ev.target.value) return;
+      document.querySelectorAll('.kml-import-type').forEach(sel=> sel.value = ev.target.value);
+    });
+    document.getElementById('kml-import-overlay').classList.add('show');
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+document.getElementById('kml-import-cancel').addEventListener('click', ()=>{
+  pendingKmlShapes = [];
+  document.getElementById('kml-import-overlay').classList.remove('show');
+});
+document.getElementById('kml-import-confirm').addEventListener('click', async ()=>{
+  const selects = document.querySelectorAll('.kml-import-type');
+  const newZones = [];
+  selects.forEach(sel=>{
+    const idx = Number(sel.dataset.idx);
+    const shape = pendingKmlShapes[idx];
+    if(!shape) return;
+    newZones.push({id:uid(), type:sel.value, latlngs:shape.latlngs});
+  });
+  const { error } = await supabaseClient.from('zones').insert(newZones.map(z=>({id:z.id, city:currentCity, type:z.type, latlngs:z.latlngs})));
+  if(error){ dbError('import stref KML', error); return; }
+  if(!state.zones[currentCity]) state.zones[currentCity] = [];
+  state.zones[currentCity].push(...newZones);
+  flashSaved();
+  pendingKmlShapes = [];
+  document.getElementById('kml-import-overlay').classList.remove('show');
+  buildOverlaysForCity();
+});
+const EMPTY_CPP_FILTER = { name:'', address:'', capacity:'', cost:'', status:'', skycash:'' };
+let cppFilter = {...EMPTY_CPP_FILTER};
+function filteredCityParkings(rows){
+  return rows.filter(p=>{
+    if(cppFilter.name && !(p.name||'').toLowerCase().includes(cppFilter.name.toLowerCase())) return false;
+    if(cppFilter.address && !(p.address||'').toLowerCase().includes(cppFilter.address.toLowerCase())) return false;
+    if(cppFilter.capacity && !String(p.capacity||0).includes(cppFilter.capacity)) return false;
+    if(cppFilter.cost && !String(p.cost||0).includes(cppFilter.cost)) return false;
+    if(cppFilter.status && p.status!==cppFilter.status) return false;
+    if(cppFilter.skycash && (p.skycash||'wlaczony')!==cppFilter.skycash) return false;
+    return true;
+  });
+}
+function renderCityParkingsPanel(){
+  const nameEl = document.getElementById('cpp-city-name');
+  const wrap = document.getElementById('cpp-table-wrap');
+  const summaryEl = document.getElementById('cpp-summary');
+  if(!wrap || !summaryEl) return;
+  if(nameEl) nameEl.textContent = '— ' + currentCity;
+  const rows = state.parkings.filter(p=>p.city===currentCity);
+  if(!rows.length){
+    wrap.innerHTML = `<div class="empty">Brak parkingów w tym mieście. Kliknij mapę, żeby dodać pierwszy.</div>`;
+  } else {
+    wrap.innerHTML = `
+      <table class="tbl-fixed">
+        <colgroup>
+          <col style="width:240px"><col style="width:190px"><col style="width:60px">
+          <col style="width:80px"><col style="width:85px"><col style="width:75px"><col style="width:110px">
+        </colgroup>
+        <tr>
+          <th>Nazwa parkingu</th><th>Adres</th><th>Miejsca</th><th>Koszt/mc</th><th>Status</th><th>SkyCash</th><th>Akcje</th>
+        </tr>
+        <tr class="filter-row">
+          <th><input id="cf-name" placeholder="Szukaj..." value="${esc(cppFilter.name)}"></th>
+          <th><input id="cf-address" placeholder="Szukaj..." value="${esc(cppFilter.address)}"></th>
+          <th><input id="cf-capacity" placeholder="Szukaj..." value="${esc(cppFilter.capacity)}"></th>
+          <th><input id="cf-cost" placeholder="Szukaj..." value="${esc(cppFilter.cost)}"></th>
+          <th><select id="cf-status"><option value="">Wszystkie</option>${Object.entries(STATUS_LABEL).map(([k,v])=>`<option value="${k}" ${cppFilter.status===k?'selected':''}>${v}</option>`).join('')}</select></th>
+          <th><select id="cf-skycash"><option value="">Wszystkie</option><option value="wlaczony" ${cppFilter.skycash==='wlaczony'?'selected':''}>Włączony</option><option value="wylaczony" ${cppFilter.skycash==='wylaczony'?'selected':''}>Wyłączony</option></select></th>
+          <th></th>
+        </tr>
+        <tbody id="cpp-body"></tbody>
+      </table>`;
+    const bindText = (id,key) => document.getElementById(id).addEventListener('input', e=>{ cppFilter[key]=e.target.value; renderCityParkingsBody(); });
+    const bindSelect = (id,key) => document.getElementById(id).addEventListener('change', e=>{ cppFilter[key]=e.target.value; renderCityParkingsBody(); });
+    bindText('cf-name','name');
+    bindText('cf-address','address');
+    bindText('cf-capacity','capacity');
+    bindText('cf-cost','cost');
+    bindSelect('cf-status','status');
+    bindSelect('cf-skycash','skycash');
+    renderCityParkingsBody();
+  }
+  const active = rows.filter(p=>p.status==='aktywny');
+  const totalSpaces = active.reduce((a,p)=>a+Number(p.capacity||0),0);
+  const totalCost = active.reduce((a,p)=>a+Number(p.cost||0),0);
+  summaryEl.innerHTML = `
+    <div style="margin-bottom:14px;"><p class="hint" style="margin:0 0 4px;">Aktywne parkingi</p><p style="font-size:22px;font-weight:500;margin:0;">${active.length}</p></div>
+    <div style="margin-bottom:14px;"><p class="hint" style="margin:0 0 4px;">Łączna liczba miejsc</p><p style="font-size:22px;font-weight:500;margin:0;">${totalSpaces}</p></div>
+    <div><p class="hint" style="margin:0 0 4px;">Łączny koszt / mc</p><p style="font-size:22px;font-weight:500;margin:0;">${totalCost.toLocaleString('pl-PL')} zł</p></div>
+  `;
+}
+function renderCityParkingsBody(){
+  const tbody = document.getElementById('cpp-body');
+  if(!tbody) return;
+  const rows = filteredCityParkings(state.parkings.filter(p=>p.city===currentCity));
+  if(!rows.length){ tbody.innerHTML = `<tr><td colspan="7"><div class="empty">Brak parkingów spełniających filtry.</div></td></tr>`; return; }
+  tbody.innerHTML = rows.map(p=>{
+    const skyOn = (p.skycash||'wlaczony')==='wlaczony';
+    const completeIcon = p.complete
+      ? `<span class="complete-flag" title="Parking kompletny" style="color:var(--succ);">✅</span>`
+      : `<span class="complete-flag" title="Wymagana akcja" style="color:#c9860a;">⚠️</span>`;
+    return `<tr data-id="${p.id}" title="Kliknij, żeby pokazać ten parking na mapie" style="cursor:pointer;">
+      <td class="cell-wrap">${esc(p.name)}</td>
+      <td class="cell-wrap" style="color:var(--ts);">${esc(p.address||'')}</td>
+      <td>${p.capacity||0}</td>
+      <td>${Number(p.cost||0).toLocaleString('pl-PL')} zł</td>
+      <td><span class="pill ${p.status}">${STATUS_LABEL[p.status]}</span></td>
+      <td><span class="pill ${skyOn?'skycash-on':'skycash-off'}">${skyOn?'Włączony':'Wyłączony'}</span></td>
+      <td>
+        <div class="row-actions">
+          ${completeIcon}
+          <button data-id="${p.id}" class="cpp-edit-btn">Edytuj</button>
+          <button data-id="${p.id}" class="cpp-details-btn">Szczegóły</button>
+          <button data-id="${p.id}" class="danger cpp-del-btn">Usuń</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+  tbody.querySelectorAll('.cpp-edit-btn').forEach(b=>b.addEventListener('click', ()=>openParkingModal(b.dataset.id)));
+  tbody.querySelectorAll('.cpp-details-btn').forEach(b=>b.addEventListener('click', ()=>openDetailsModal(b.dataset.id)));
+  tbody.querySelectorAll('.cpp-del-btn').forEach(b=>b.addEventListener('click', ()=>deleteParking(b.dataset.id)));
+}
+let ACTIVE_ICON = null;
+function activeIcon(){
+  if(!ACTIVE_ICON){
+    ACTIVE_ICON = L.icon({
+      iconUrl: 'logo-spot-icon.png',
+      iconSize: [40, 30],
+      iconAnchor: [20, 30],
+      popupAnchor: [0, -26]
+    });
+  }
+  return ACTIVE_ICON;
+}
+function plotParkingMarkers(){
+  if(!map) return;
+  markersOnMap.forEach(m=>map.removeLayer(m));
+  markersOnMap = [];
+  markersById = {};
+  state.parkings.filter(p=>p.city===currentCity && p.lat!=null && p.lng!=null).forEach(p=>{
+    let m;
+    if(p.status === 'aktywny'){
+      m = L.marker([p.lat,p.lng], {icon: activeIcon()}).addTo(map);
+    } else {
+      const color = STATUS_COLOR[p.status] || '#6b6a64';
+      m = L.circleMarker([p.lat,p.lng], {radius:7, color:'#fff', weight:1.5, fillColor:color, fillOpacity:1}).addTo(map);
+    }
+    m.on('click', e=> {
+      if(polyMode) return;
+      L.DomEvent.stopPropagation(e);
+      openDetailsModal(p.id);
+    });
+    markersOnMap.push(m);
+    markersById[p.id] = m;
+  });
+}
+function showParkingOnMap(id){
+  const m = markersById[id];
+  if(!m){ alert('Ten parking nie ma ustawionych współrzędnych na mapie.'); return; }
+  map.setView(m.getLatLng(), Math.max(map.getZoom(), 15));
+  openDetailsModal(id);
+}
+function renderLegend(){
+  const el = document.getElementById('m-legend');
+  if(!el) return;
+  el.innerHTML = `
+    <span><img src="logo-spot-icon.png" style="height:16px;vertical-align:-3px;margin-right:5px;">Aktywny</span>
+    <span><span class="dot" style="background:#854f0b;"></span>W rozmowach</span>
+    <span><span class="dot" style="background:#6b6a64;"></span>Typowany</span>
+    <span><span class="dot" style="background:#a32d2d;"></span>Odrzucony</span>
+    <span><span class="sq" style="background:${ZONE_STYLES.traficar.color};"></span>${ZONE_STYLES.traficar.label}</span>
+    <span><span class="sq" style="background:${ZONE_STYLES.spp.color};"></span>${ZONE_STYLES.spp.label}</span>
+    <span><span class="sq" style="background:${ZONE_STYLES.proponowana.color};"></span>${ZONE_STYLES.proponowana.label}</span>
+    <span><span class="sq" style="background:${ZONE_STYLES.wykluczona.color};"></span>${ZONE_STYLES.wykluczona.label}</span>
+    <span>Klik na strefie = usuń/modyfikuj</span>
+  `;
+}
+
+/* ---------- CHARTS ---------- */
+function renderCharts(){
+  const el = document.getElementById('view-charts');
+  el.innerHTML = `
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <p class="section-title" style="margin:0;">Postęp wg miast: cel / aktywne / w rozmowach / typowane</p>
+        <button id="dl-chart-img" title="Pobierz jako obraz" style="padding:4px 9px;">⬇️</button>
+      </div>
+      <div style="height:420px;"><canvas id="progress-chart"></canvas></div>
+    </div>
+    <p class="sub" style="margin-top:10px;">Cel wg miasta ustawiasz w zakładce Ustawienia. Liczby „mamy” i „w rozmowach” liczą się automatycznie z bazy parkingów.</p>`;
+  const cities = Object.keys(CITIES);
+  const have = cities.map(c=>state.parkings.filter(p=>p.city===c && p.status==='aktywny').length);
+  const rozmowy = cities.map(c=>state.parkings.filter(p=>p.city===c && p.status==='rozmowy').length);
+  const typowane = cities.map(c=>state.parkings.filter(p=>p.city===c && p.status==='typowany').length);
+  const target = cities.map(c=>Number(state.targets[c]||0));
+  if(chart) chart.destroy();
+  const ctx = document.getElementById('progress-chart').getContext('2d');
+  chart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: cities,
+      datasets: [
+        {label:'Cel', data: target, backgroundColor:'#c9c7bc'},
+        {label:'Aktywne', data: have, backgroundColor:'#3b6d11'},
+        {label:'W rozmowach', data: rozmowy, backgroundColor:'#854f0b'},
+        {label:'Typowane', data: typowane, backgroundColor:'#6b6a64'}
+      ]
+    },
+    options: {
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom', labels:{font:{size:12}}}},
+      scales:{ y:{beginAtZero:true, ticks:{stepSize:1, precision:0}} }
+    }
+  });
+  document.getElementById('dl-chart-img').addEventListener('click', ()=>{
+    const link = document.createElement('a');
+    link.download = 'wykres_postepu.png';
+    link.href = chart.toBase64Image();
+    link.click();
+  });
+}
+
+/* ---------- CALENDAR ---------- */
+let activeDayDate = null;
+function renderCalendar(){
+  const el = document.getElementById('view-calendar');
+  el.innerHTML = `
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <button id="cal-prev">‹</button>
+        <span id="cal-label" style="font-size:15px;font-weight:500;min-width:170px;text-align:center;display:inline-block;"></span>
+        <button id="cal-next">›</button>
+      </div>
+      <button id="cal-today">Dziś</button>
+    </div>
+    <div class="card">
+      <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;"></div>
+    </div>
+  `;
+  document.getElementById('cal-prev').addEventListener('click', ()=>{ calDate.setMonth(calDate.getMonth()-1); renderCalendarGrid(); });
+  document.getElementById('cal-next').addEventListener('click', ()=>{ calDate.setMonth(calDate.getMonth()+1); renderCalendarGrid(); });
+  document.getElementById('cal-today').addEventListener('click', ()=>{ calDate = new Date(); renderCalendarGrid(); });
+  renderCalendarGrid();
+}
+function renderCalendarGrid(){
+  const label = document.getElementById('cal-label');
+  const grid = document.getElementById('cal-grid');
+  const y = calDate.getFullYear(), m = calDate.getMonth();
+  label.textContent = MONTH_NAMES[m] + ' ' + y;
+  const firstDay = new Date(y, m, 1);
+  const startWeekday = (firstDay.getDay()+6)%7;
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const todayStr = toDateStr(new Date());
+
+  let html = DAY_NAMES.map(d=>`<div class="cal-daynames">${d}</div>`).join('');
+  for(let i=0;i<startWeekday;i++) html += `<div></div>`;
+  for(let d=1; d<=daysInMonth; d++){
+    const dateStr = toDateStr(new Date(y,m,d));
+    const dayTasks = state.tasks.filter(t=>t.date===dateStr);
+    const isToday = dateStr===todayStr;
+    html += `<div class="cal-day${isToday?' today':''}" data-date="${dateStr}">
+      <span class="cal-day-num">${d}</span>
+      ${dayTasks.length? `<span class="cal-day-dot">${dayTasks.length}</span>`:''}
+    </div>`;
+  }
+  grid.innerHTML = html;
+  grid.querySelectorAll('.cal-day').forEach(cell=>{
+    cell.addEventListener('click', ()=> openDayOverlay(cell.dataset.date));
+  });
+}
+function openDayOverlay(dateStr){
+  activeDayDate = dateStr;
+  const d = new Date(dateStr+'T00:00:00');
+  document.getElementById('day-overlay-title').textContent = d.toLocaleDateString('pl-PL', {day:'numeric', month:'long', year:'numeric'});
+  renderDayTasksList();
+  document.getElementById('day-overlay').classList.add('show');
+}
+function renderDayTasksList(){
+  const wrap = document.getElementById('day-tasks-list');
+  const tasks = state.tasks.filter(t=>t.date===activeDayDate);
+  if(!tasks.length){ wrap.innerHTML = `<p class="hint" style="margin:8px 0;">Brak zadań na ten dzień.</p>`; return; }
+  wrap.innerHTML = tasks.map(t=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--bd);">
+      <input type="checkbox" data-id="${t.id}" class="task-done-cb" ${t.done?'checked':''}>
+      <span style="flex:1;${t.done?'text-decoration:line-through;color:var(--tm);':''}">${esc(t.title)}</span>
+      <button data-id="${t.id}" class="task-edit-btn">Edytuj</button>
+      <button data-id="${t.id}" class="danger task-del-btn">Usuń</button>
+    </div>
+  `).join('');
+  wrap.querySelectorAll('.task-done-cb').forEach(cb=>cb.addEventListener('change', async ()=>{
+    const t = state.tasks.find(x=>x.id===cb.dataset.id);
+    if(!t) return;
+    const { error } = await supabaseClient.from('tasks').update({done: cb.checked}).eq('id', t.id);
+    if(error){ dbError('aktualizacja zadania', error); cb.checked = t.done; return; }
+    t.done = cb.checked; flashSaved();
+    renderDayTasksList(); renderCalendarGrid(); if(document.getElementById('view-dashboard').classList.contains('active')) renderDashboard();
+  }));
+  wrap.querySelectorAll('.task-edit-btn').forEach(b=>b.addEventListener('click', ()=>openTaskModal(b.dataset.id)));
+  wrap.querySelectorAll('.task-del-btn').forEach(b=>b.addEventListener('click', async ()=>{
+    const { error } = await supabaseClient.from('tasks').delete().eq('id', b.dataset.id);
+    if(error){ dbError('usuwanie zadania', error); return; }
+    state.tasks = state.tasks.filter(x=>x.id!==b.dataset.id);
+    flashSaved();
+    renderDayTasksList(); renderCalendarGrid();
+    if(document.getElementById('view-dashboard').classList.contains('active')) renderDashboard();
+  }));
+}
+document.getElementById('day-add-task').addEventListener('click', ()=> openTaskModal(null));
+document.getElementById('day-close').addEventListener('click', ()=>{
+  document.getElementById('day-overlay').classList.remove('show');
+});
+function openTaskModal(id){
+  const t = id? state.tasks.find(x=>x.id===id) : null;
+  document.getElementById('task-modal-title').textContent = id? 'Edytuj zadanie' : 'Nowe zadanie';
+  document.getElementById('tk-id').value = id||'';
+  document.getElementById('tk-date').value = t? t.date : activeDayDate;
+  document.getElementById('tk-title').value = t? t.title : '';
+  document.getElementById('tk-notes').value = t? (t.notes||'') : '';
+  document.getElementById('task-overlay').classList.add('show');
+}
+document.getElementById('tk-cancel').addEventListener('click', ()=>{
+  document.getElementById('task-overlay').classList.remove('show');
+});
+document.getElementById('tk-save').addEventListener('click', async ()=>{
+  const id = document.getElementById('tk-id').value;
+  const title = document.getElementById('tk-title').value.trim();
+  if(!title){ alert('Podaj tytuł zadania.'); return; }
+  const existing = id? state.tasks.find(x=>x.id===id) : null;
+  const rec = {
+    id: id || uid(),
+    date: document.getElementById('tk-date').value || activeDayDate,
+    title,
+    notes: document.getElementById('tk-notes').value.trim(),
+    done: existing? existing.done : false
+  };
+  const { error } = await supabaseClient.from('tasks').upsert(rec);
+  if(error){ dbError('zapis zadania', error); return; }
+  if(id){ const idx = state.tasks.findIndex(x=>x.id===id); state.tasks[idx] = rec; }
+  else state.tasks.push(rec);
+  flashSaved();
+  document.getElementById('task-overlay').classList.remove('show');
+  activeDayDate = rec.date;
+  renderDayTasksList();
+  renderCalendarGrid();
+  if(document.getElementById('view-dashboard').classList.contains('active')) renderDashboard();
+});
+
+/* ---------- SETTINGS ---------- */
+function renderSettings(){
+  const el = document.getElementById('view-settings');
+  el.innerHTML = `
+    <p class="section-title">Cele wg miast (liczba docelowych spotów)</p>
+    <div class="card">
+      ${Object.keys(CITIES).map(c=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bd);">
+          <span style="font-size:14px;">${c}</span>
+          <input type="number" min="0" style="width:90px;" data-city="${c}" class="target-input" value="${state.targets[c]||0}">
+        </div>
+      `).join('')}
+    </div>
+    <p class="sub" style="margin-top:10px;">Wartości domyślne wczytane z planu projektu — zaktualizuj je, jeśli cele się zmieniły.</p>
+
+    <p class="section-title" style="margin-top:24px;">Migracja starych danych z tej przeglądarki</p>
+    <div class="card">
+      <p class="hint" style="margin:0 0 10px;">Jednorazowo przenosi dane zapisane wcześniej lokalnie w tej przeglądarce (parkingi, strefy, zadania, cele) do wspólnej bazy. Bezpieczne do kliknięcia więcej niż raz — nie nadpisze nowszych danych w bazie tym samym rekordem.</p>
+      <button id="migrate-btn">Migruj dane z tej przeglądarki</button>
+    </div>
+  `;
+  el.querySelectorAll('.target-input').forEach(inp=>{
+    inp.addEventListener('change', async ()=>{
+      const value = Number(inp.value)||0;
+      const { error } = await supabaseClient.from('targets').upsert({city: inp.dataset.city, target: value});
+      if(error){ dbError('zapis celu', error); return; }
+      state.targets[inp.dataset.city] = value;
+      flashSaved();
+    });
+  });
+  document.getElementById('migrate-btn').addEventListener('click', migrateFromLocalStorage);
+}
+async function migrateFromLocalStorage(){
+  const prefix = 'spoty_osobowe_';
+  let oldParkings, oldTargets, oldZones, oldTasks;
+  try{
+    oldParkings = JSON.parse(localStorage.getItem(prefix+'parkings-data') || 'null');
+    oldTargets = JSON.parse(localStorage.getItem(prefix+'city-targets') || 'null');
+    oldZones = JSON.parse(localStorage.getItem(prefix+'city-zones') || 'null');
+    oldTasks = JSON.parse(localStorage.getItem(prefix+'tasks-data') || 'null');
+  }catch(e){ alert('Nie udało się odczytać starych danych z tej przeglądarki.'); return; }
+  if((!oldParkings || !oldParkings.length) && !oldTargets && (!oldZones || !Object.keys(oldZones).length) && (!oldTasks || !oldTasks.length)){
+    alert('Nie znaleziono starych danych w tej przeglądarce (localStorage puste albo już zmigrowane/wyczyszczone).');
+    return;
+  }
+  if(!confirm('Przenieść dane zapisane lokalnie w tej przeglądarce do wspólnej bazy?')) return;
+  const summary = [];
+  if(oldParkings && oldParkings.length){
+    const { error } = await supabaseClient.from('parkings').upsert(oldParkings.map(parkingToRow));
+    if(error){ dbError('migracja parkingów', error); return; }
+    summary.push(oldParkings.length + ' parkingów');
+  }
+  if(oldTargets){
+    const rows = Object.keys(oldTargets).map(city=>({city, target: Number(oldTargets[city])||0}));
+    if(rows.length){
+      const { error } = await supabaseClient.from('targets').upsert(rows);
+      if(error){ dbError('migracja celów', error); return; }
+      summary.push(rows.length + ' celów');
+    }
+  }
+  if(oldZones){
+    const rows = [];
+    Object.keys(oldZones).forEach(city=>{
+      (oldZones[city]||[]).forEach(z=> rows.push({id:z.id, city, type:z.type, latlngs:z.latlngs}));
+    });
+    if(rows.length){
+      const { error } = await supabaseClient.from('zones').upsert(rows);
+      if(error){ dbError('migracja stref', error); return; }
+      summary.push(rows.length + ' stref');
+    }
+  }
+  if(oldTasks && oldTasks.length){
+    const { error } = await supabaseClient.from('tasks').upsert(oldTasks.map(t=>({id:t.id, date:t.date, title:t.title, notes:t.notes||'', done:!!t.done})));
+    if(error){ dbError('migracja zadań', error); return; }
+    summary.push(oldTasks.length + ' zadań');
+  }
+  alert('Zmigrowano: ' + (summary.length? summary.join(', ') : 'brak danych') + '.');
+  await loadAll();
+  renderDashboard();
+  renderSettings();
+}
+
+/* ---------- AUTH + INIT ---------- */
+function showLoginScreen(){
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app-root').style.display = 'none';
+}
+async function showApp(){
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-root').style.display = 'block';
+  await loadAll();
+  renderDashboard();
+}
+async function attemptLogin(){
+  const password = document.getElementById('login-password').value;
+  const errorEl = document.getElementById('login-error');
+  errorEl.style.display = 'none';
+  if(!password){ errorEl.textContent = 'Podaj hasło.'; errorEl.style.display = 'block'; return; }
+  const { error } = await supabaseClient.auth.signInWithPassword({ email: SHARED_LOGIN_EMAIL, password });
+  if(error){
+    errorEl.textContent = 'Błędne hasło albo brak połączenia z bazą. Spróbuj ponownie.';
+    errorEl.style.display = 'block';
+    return;
+  }
+  document.getElementById('login-password').value = '';
+  await showApp();
+}
+document.getElementById('login-submit').addEventListener('click', attemptLogin);
+document.getElementById('login-password').addEventListener('keydown', e=>{ if(e.key==='Enter') attemptLogin(); });
+document.getElementById('logout-btn').addEventListener('click', async ()=>{
+  await supabaseClient.auth.signOut();
+  location.reload();
+});
+
+/* ---------- INIT ---------- */
+(async function(){
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if(session){ await showApp(); }
+  else { showLoginScreen(); }
+})();
+</script>
+</body>
+</html>
