@@ -1524,14 +1524,15 @@ document.getElementById('za-add-excluded').addEventListener('click', async ()=>{
   activeZoneForAction = null;
 });
 document.getElementById('za-delete').addEventListener('click', async ()=>{
+  const zone = activeZoneForAction;
   document.getElementById('zone-action-overlay').classList.remove('show');
-  if(activeZoneForAction){
-    const { error } = await supabaseClient.from('zones').delete().eq('id', activeZoneForAction.id);
-    if(error){ dbError('usuwanie strefy', error); activeZoneForAction = null; return; }
-    state.zones[currentCity] = (state.zones[currentCity]||[]).filter(zz=>zz.id!==activeZoneForAction.id);
-    flashSaved();
-    buildOverlaysForCity();
-  }
+  if(!zone){ activeZoneForAction = null; return; }
+  if(!confirm('Na pewno usunąć tę strefę? Tej operacji nie można cofnąć.')){ activeZoneForAction = null; return; }
+  const { error } = await supabaseClient.from('zones').delete().eq('id', zone.id);
+  if(error){ dbError('usuwanie strefy', error); activeZoneForAction = null; return; }
+  state.zones[currentCity] = (state.zones[currentCity]||[]).filter(zz=>zz.id!==zone.id);
+  flashSaved();
+  buildOverlaysForCity();
   activeZoneForAction = null;
 });
 document.getElementById('za-cancel').addEventListener('click', ()=>{
@@ -2024,6 +2025,7 @@ function renderDayTasksList(){
   }));
   wrap.querySelectorAll('.task-edit-btn').forEach(b=>b.addEventListener('click', ()=>openTaskModal(b.dataset.id)));
   wrap.querySelectorAll('.task-del-btn').forEach(b=>b.addEventListener('click', async ()=>{
+    if(!confirm('Na pewno usunąć to zadanie?')) return;
     const { error } = await supabaseClient.from('tasks').delete().eq('id', b.dataset.id);
     if(error){ dbError('usuwanie zadania', error); return; }
     state.tasks = state.tasks.filter(x=>x.id!==b.dataset.id);
