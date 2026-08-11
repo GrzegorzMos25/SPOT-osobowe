@@ -73,7 +73,7 @@ button.danger{color:var(--dang);}
 .pill.skycash-off{background:var(--bgsucc);color:var(--succ);}
 .toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;justify-content:space-between;}
 .toolbar-left{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
-.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;overflow-y:auto;}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:2500;overflow-y:auto;}
 .overlay.show{display:flex;justify-content:center;align-items:flex-start;padding:40px 16px;}
 .modal{background:var(--s1);border-radius:12px;padding:20px 22px;width:440px;max-width:92vw;}
 .modal h3{font-size:16px;font-weight:500;margin:0 0 14px;}
@@ -95,6 +95,8 @@ canvas{max-width:100%;}
 .city-tile-btn{padding:8px 14px;border-radius:20px;font-size:13px;border:1px solid var(--bds);background:var(--s2);}
 .city-tile-btn.active{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:500;}
 .vertex-handle{width:14px;height:14px;border-radius:50%;background:#185fa5;border:2px solid #fff;box-shadow:0 0 3px rgba(0,0,0,0.5);cursor:grab;}
+.status-pin-wrap{background:transparent!important;border:none!important;}
+.status-pin{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px;font-family:inherit;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.45);}
 .vertex-handle.mid{background:rgba(24,95,165,0.55);box-shadow:none;cursor:copy;}
 #map.drawing-cursor, #map.drawing-cursor .leaflet-grab{cursor:crosshair !important;}
 .city-parkings-wrap{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin-top:18px;}
@@ -181,9 +183,13 @@ body.map-maximized-active{overflow:hidden;}
         <input id="f-capacity" type="number" min="0">
       </div>
       <div class="field">
-        <label>Koszt miesięczny (zł)</label>
-        <input id="f-cost" type="number" min="0">
+        <label>Koszt za miejsce (zł)</label>
+        <input id="f-cost-per-spot" type="number" min="0">
       </div>
+    </div>
+    <div class="field">
+      <label>Koszt łączny (zł)</label>
+      <input id="f-cost" type="number" min="0">
     </div>
     <div class="field-row">
       <div class="field">
@@ -308,6 +314,17 @@ body.map-maximized-active{overflow:hidden;}
     <button class="zone-type-btn" id="za-delete" style="background:var(--bgdang);color:var(--dang);border-color:var(--bgdang);">Usuń strefę</button>
     <div class="modal-actions">
       <button id="za-cancel">Anuluj</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="layer-picker-overlay">
+  <div class="modal">
+    <h3>Kilka stref w tym miejscu</h3>
+    <p class="hint" style="margin:0 0 12px;">W tym miejscu nakłada się więcej niż jedna strefa. Wybierz, którą chcesz zmienić lub usunąć.</p>
+    <div id="layer-picker-list"></div>
+    <div class="modal-actions">
+      <button id="layer-picker-cancel">Anuluj</button>
     </div>
   </div>
 </div>
@@ -709,6 +726,7 @@ function openParkingModal(id, prefill){
   document.getElementById('f-address').value = p.address||'';
   document.getElementById('f-capacity').value = p.capacity||'';
   document.getElementById('f-cost').value = p.cost||'';
+  document.getElementById('f-cost-per-spot').value = (p.capacity>0) ? Math.round(Number(p.cost||0)/Number(p.capacity)) : '';
   document.getElementById('f-lat').value = (p.lat!==undefined && p.lat!==null)? p.lat : '';
   document.getElementById('f-lng').value = (p.lng!==undefined && p.lng!==null)? p.lng : '';
   document.getElementById('f-contract').value = p.contractEnd||'';
@@ -720,6 +738,19 @@ function openParkingModal(id, prefill){
 document.getElementById('f-cancel').addEventListener('click', ()=>{
   document.getElementById('parking-overlay').classList.remove('show');
 });
+function recalcCostFromPerSpot(){
+  const capacity = Number(document.getElementById('f-capacity').value)||0;
+  const perSpot = Number(document.getElementById('f-cost-per-spot').value)||0;
+  document.getElementById('f-cost').value = capacity>0 ? (perSpot*capacity) : '';
+}
+function recalcPerSpotFromCost(){
+  const capacity = Number(document.getElementById('f-capacity').value)||0;
+  const cost = Number(document.getElementById('f-cost').value)||0;
+  document.getElementById('f-cost-per-spot').value = capacity>0 ? Math.round(cost/capacity) : '';
+}
+document.getElementById('f-cost-per-spot').addEventListener('input', recalcCostFromPerSpot);
+document.getElementById('f-cost').addEventListener('input', recalcPerSpotFromCost);
+document.getElementById('f-capacity').addEventListener('input', recalcCostFromPerSpot);
 document.getElementById('f-save').addEventListener('click', async ()=>{
   const id = document.getElementById('f-id').value;
   const existing = id? state.parkings.find(x=>x.id===id) : null;
@@ -999,13 +1030,42 @@ function pointInPolygon(lat, lng, latlngs){
   }
   return inside;
 }
-function findZoneAt(lat, lng){
+function findZonesAt(lat, lng){
   const zones = state.zones[currentCity] || [];
+  const matches = [];
   for(let i=zones.length-1; i>=0; i--){
-    if(pointInPolygon(lat, lng, zones[i].latlngs)) return zones[i];
+    if(pointInPolygon(lat, lng, zones[i].latlngs)) matches.push(zones[i]);
   }
-  return null;
+  return matches;
 }
+function openZoneActionOverlay(zone){
+  activeZoneForAction = zone;
+  const style = ZONE_STYLES[zone.type];
+  document.getElementById('zone-action-title').textContent = style.label;
+  document.getElementById('za-add-excluded').style.display = (zone.type==='proponowana') ? 'block' : 'none';
+  document.getElementById('zone-action-overlay').classList.add('show');
+}
+let layerPickerZones = [];
+function openLayerPicker(zones, onPick){
+  layerPickerZones = zones;
+  const list = document.getElementById('layer-picker-list');
+  list.innerHTML = zones.map((z,i)=>{
+    const style = ZONE_STYLES[z.type];
+    return `<button class="zone-type-btn" data-idx="${i}" style="background:${style.color}22;color:${style.color};border-color:${style.color}55;">`
+      + `<span class="sq" style="background:${style.color};display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;"></span>${style.label}</button>`;
+  }).join('');
+  list.querySelectorAll('button[data-idx]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const zone = layerPickerZones[Number(btn.dataset.idx)];
+      document.getElementById('layer-picker-overlay').classList.remove('show');
+      onPick(zone);
+    });
+  });
+  document.getElementById('layer-picker-overlay').classList.add('show');
+}
+document.getElementById('layer-picker-cancel').addEventListener('click', ()=>{
+  document.getElementById('layer-picker-overlay').classList.remove('show');
+});
 function formatDistance(meters){
   if(meters >= 1000) return (meters/1000).toFixed(2) + ' km';
   return Math.round(meters) + ' m';
@@ -1056,7 +1116,8 @@ function closeMapContextMenu(){
 document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeMapContextMenu(); });
 function showMapContextMenu(screenX, screenY, latlng){
   closeMapContextMenu();
-  const zone = findZoneAt(latlng.lat, latlng.lng);
+  const matches = findZonesAt(latlng.lat, latlng.lng);
+  const zone = matches.length === 1 ? matches[0] : null;
   const menu = document.createElement('div');
   menu.id = 'map-context-menu';
   menu.style.cssText = 'position:fixed;left:'+screenX+'px;top:'+screenY+'px;background:var(--s1);border:1px solid var(--bds);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.3);z-index:6000;min-width:220px;padding:6px;';
@@ -1068,6 +1129,8 @@ function showMapContextMenu(screenX, screenY, latlng){
       html += `<button class="zone-type-btn" id="cm-add-excluded" style="background:var(--bgdang);color:var(--dang);border-color:var(--bgdang);">Dodaj do wykluczonej</button>`;
     }
     html += `<button class="zone-type-btn" id="cm-delete-zone" style="background:var(--bgdang);color:var(--dang);border-color:var(--bgdang);">🗑️ Usuń strefę</button>`;
+  } else if(matches.length > 1){
+    html += `<button class="zone-type-btn" id="cm-pick-zone" style="background:var(--bgacc);color:var(--acc);border-color:var(--bgacc);">🗂️ Wybierz strefę (${matches.length} nakładających się)</button>`;
   }
   html += `<button class="zone-type-btn" id="cm-measure">📏 Mierz odległość od tego punktu</button>`;
   html += `<button class="zone-type-btn" id="cm-cancel">Anuluj</button>`;
@@ -1101,6 +1164,11 @@ function showMapContextMenu(screenX, screenY, latlng){
       state.zones[currentCity] = (state.zones[currentCity]||[]).filter(zz=>zz.id!==zone.id);
       flashSaved();
       buildOverlaysForCity();
+    });
+  } else if(matches.length > 1){
+    document.getElementById('cm-pick-zone').addEventListener('click', ()=>{
+      closeMapContextMenu();
+      openLayerPicker(matches, openZoneActionOverlay);
     });
   }
   document.getElementById('cm-measure').addEventListener('click', ()=>{
@@ -1490,10 +1558,12 @@ function buildOverlaysForCity(){
         renderMapControls();
         return;
       }
-      activeZoneForAction = z;
-      document.getElementById('zone-action-title').textContent = style.label;
-      document.getElementById('za-add-excluded').style.display = (z.type==='proponowana') ? 'block' : 'none';
-      document.getElementById('zone-action-overlay').classList.add('show');
+      const matches = findZonesAt(e.latlng.lat, e.latlng.lng);
+      if(matches.length > 1){
+        openLayerPicker(matches, openZoneActionOverlay);
+      } else {
+        openZoneActionOverlay(matches.length ? matches[0] : z);
+      }
     });
     zonePolysOnMap.push({id:z.id, layer});
   });
@@ -1775,6 +1845,19 @@ function activeIcon(){
   }
   return ACTIVE_ICON;
 }
+const STATUS_PIN_ICONS = {};
+function statusPinIcon(color){
+  if(!STATUS_PIN_ICONS[color]){
+    STATUS_PIN_ICONS[color] = L.divIcon({
+      className: 'status-pin-wrap',
+      html: '<div class="status-pin" style="background:'+color+';">P</div>',
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+      popupAnchor: [0, -12]
+    });
+  }
+  return STATUS_PIN_ICONS[color];
+}
 function plotParkingMarkers(){
   if(!map) return;
   markersOnMap.forEach(m=>map.removeLayer(m));
@@ -1786,7 +1869,7 @@ function plotParkingMarkers(){
       m = L.marker([p.lat,p.lng], {icon: activeIcon()}).addTo(map);
     } else {
       const color = STATUS_COLOR[p.status] || '#6b6a64';
-      m = L.circleMarker([p.lat,p.lng], {radius:7, color:'#fff', weight:1.5, fillColor:color, fillOpacity:1}).addTo(map);
+      m = L.marker([p.lat,p.lng], {icon: statusPinIcon(color)}).addTo(map);
     }
     m.on('click', e=> {
       if(polyMode || measureMode) return;
@@ -1808,9 +1891,9 @@ function renderLegend(){
   if(!el) return;
   el.innerHTML = `
     <span><img src="logo-spot-icon.png" style="height:16px;vertical-align:-3px;margin-right:5px;">Aktywny</span>
-    <span><span class="dot" style="background:#854f0b;"></span>W rozmowach</span>
-    <span><span class="dot" style="background:#6b6a64;"></span>Typowany</span>
-    <span><span class="dot" style="background:#a32d2d;"></span>Odrzucony</span>
+    <span><span class="status-pin" style="width:16px;height:16px;font-size:9px;border-width:1px;vertical-align:-3px;margin-right:5px;display:inline-flex;background:#854f0b;">P</span>W rozmowach</span>
+    <span><span class="status-pin" style="width:16px;height:16px;font-size:9px;border-width:1px;vertical-align:-3px;margin-right:5px;display:inline-flex;background:#6b6a64;">P</span>Typowany</span>
+    <span><span class="status-pin" style="width:16px;height:16px;font-size:9px;border-width:1px;vertical-align:-3px;margin-right:5px;display:inline-flex;background:#a32d2d;">P</span>Odrzucony</span>
     <span><span class="sq" style="background:${ZONE_STYLES.traficar.color};"></span>${ZONE_STYLES.traficar.label}</span>
     <span><span class="sq" style="background:${ZONE_STYLES.spp.color};"></span>${ZONE_STYLES.spp.label}</span>
     <span><span class="sq" style="background:${ZONE_STYLES.proponowana.color};"></span>${ZONE_STYLES.proponowana.label}</span>
