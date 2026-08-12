@@ -287,7 +287,7 @@ body.map-maximized-active{overflow:hidden;}
     <p class="hint" id="kml-import-progress" style="margin:8px 0 0;display:none;"></p>
     <div class="modal-actions">
       <button id="kml-import-cancel">Anuluj</button>
-      <button class="primary" id="kml-import-confirm">Importuj</button>
+      <button class="primary" id="kml-import-confirm">Zapisz strefy</button>
     </div>
   </div>
 </div>
@@ -374,14 +374,14 @@ body.map-maximized-active{overflow:hidden;}
 const CITIES = {
   "Wrocław": [51.1079, 17.0385],
   "Poznań": [52.4064, 16.9252],
-  "Katowice": [50.2649, 19.0238],
+  "Śląsk": [50.2649, 19.0238],
   "Łódź": [51.7592, 19.4560],
   "Szczecin": [53.4285, 14.5528],
   "Kraków": [50.0647, 19.9450],
-  "Gdańsk": [54.3520, 18.6466],
+  "Trójmiasto": [54.3520, 18.6466],
   "Warszawa": [52.2297, 21.0122]
 };
-const DEFAULT_TARGETS = { "Katowice":8, "Wrocław":10, "Poznań":12, "Łódź":7, "Szczecin":10, "Kraków":19, "Gdańsk":29, "Warszawa":23 };
+const DEFAULT_TARGETS = { "Śląsk":8, "Wrocław":10, "Poznań":12, "Łódź":7, "Szczecin":10, "Kraków":19, "Trójmiasto":29, "Warszawa":23 };
 const ZONE_STYLES = {
   traficar:{color:'#2e7d32', fillColor:'#2e7d32', label:'Strefa Traficar'},
   spp:{color:'#185fa5', fillColor:'#185fa5', label:'Strefa płatnego parkowania'},
@@ -1705,6 +1705,18 @@ function parseKML(text){
   });
   return shapes;
 }
+const LAST_KML_TYPE_KEY = 'spoty_osobowe_last_kml_type';
+function getLastKmlType(){
+  try{ return localStorage.getItem(LAST_KML_TYPE_KEY) || 'traficar'; }catch(e){ return 'traficar'; }
+}
+function rememberKmlType(type){
+  try{ localStorage.setItem(LAST_KML_TYPE_KEY, type); }catch(e){}
+}
+function kmlTypeOptions(selectedType){
+  return ['traficar','spp','proponowana','wykluczona'].map(t=>
+    `<option value="${t}" ${t===selectedType?'selected':''}>${ZONE_STYLES[t].label}</option>`
+  ).join('');
+}
 document.getElementById('kml-file-input').addEventListener('change', (e)=>{
   const file = e.target.files[0];
   if(!file) return;
@@ -1712,31 +1724,20 @@ document.getElementById('kml-file-input').addEventListener('change', (e)=>{
   reader.onload = ()=>{
     pendingKmlShapes = parseKML(reader.result);
     if(!pendingKmlShapes.length){ alert('Nie znaleziono żadnych stref (wielokątów) w tym pliku KML.'); return; }
+    const lastType = getLastKmlType();
     document.getElementById('kml-import-city').textContent = currentCity;
     document.getElementById('kml-import-list').innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;padding:0 0 10px;border-bottom:1px solid var(--bd);margin-bottom:8px;">
-        <span style="flex:1;font-size:13px;color:var(--ts);">Ustaw typ dla wszystkich naraz:</span>
-        <select id="kml-import-type-all">
-          <option value="">— wybierz —</option>
-          <option value="traficar">Traficar</option>
-          <option value="spp">SPP</option>
-          <option value="proponowana">Proponowana</option>
-          <option value="wykluczona">Wykluczona</option>
-        </select>
+        <span style="flex:1;font-size:13px;color:var(--ts);">Typ dla wszystkich (zapamiętany z ostatniego razu):</span>
+        <select id="kml-import-type-all">${kmlTypeOptions(lastType)}</select>
       </div>
     ` + pendingKmlShapes.map((s,i)=>`
       <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bd);">
         <span style="flex:1;font-size:13px;">${esc(s.name)}</span>
-        <select class="kml-import-type" data-idx="${i}">
-          <option value="traficar">Traficar</option>
-          <option value="spp">SPP</option>
-          <option value="proponowana">Proponowana</option>
-          <option value="wykluczona">Wykluczona</option>
-        </select>
+        <select class="kml-import-type" data-idx="${i}">${kmlTypeOptions(lastType)}</select>
       </div>
     `).join('');
     document.getElementById('kml-import-type-all').addEventListener('change', (ev)=>{
-      if(!ev.target.value) return;
       document.querySelectorAll('.kml-import-type').forEach(sel=> sel.value = ev.target.value);
     });
     document.getElementById('kml-import-overlay').classList.add('show');
@@ -1789,10 +1790,12 @@ document.getElementById('kml-import-confirm').addEventListener('click', async ()
   progressEl.style.display = 'none';
   if(!state.zones[currentCity]) state.zones[currentCity] = [];
   state.zones[currentCity].push(...newZones);
+  rememberKmlType(document.getElementById('kml-import-type-all').value);
   flashSaved();
   pendingKmlShapes = [];
   document.getElementById('kml-import-overlay').classList.remove('show');
   buildOverlaysForCity();
+  alert('Zapisano ' + rows.length + ' ' + (rows.length===1?'strefę':'stref') + ' w mieście ' + currentCity + '. Są już w bazie i widoczne na mapie.');
 });
 const EMPTY_CPP_FILTER = { name:'', address:'', capacity:'', cost:'', status:'', skycash:'' };
 let cppFilter = {...EMPTY_CPP_FILTER};
