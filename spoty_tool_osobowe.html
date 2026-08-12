@@ -284,6 +284,7 @@ body.map-maximized-active{overflow:hidden;}
     <h3>Import stref z KML</h3>
     <p class="hint" style="margin:0 0 12px;">Wybierz typ dla każdej znalezionej strefy. Wszystkie trafią do miasta: <b id="kml-import-city"></b>.</p>
     <div id="kml-import-list" style="max-height:320px;overflow-y:auto;"></div>
+    <p class="hint" id="kml-import-progress" style="margin:8px 0 0;display:none;"></p>
     <div class="modal-actions">
       <button id="kml-import-cancel">Anuluj</button>
       <button class="primary" id="kml-import-confirm">Importuj</button>
@@ -1242,7 +1243,7 @@ function initMapView(){
 }
 
 function buildMap(){
-  map = L.map('map').setView(CITIES[currentCity], 12);
+  map = L.map('map', {renderer: L.canvas()}).setView(CITIES[currentCity], 12);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
     attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
     maxZoom: 20,
@@ -1740,8 +1741,36 @@ document.getElementById('kml-import-confirm').addEventListener('click', async ()
     if(!shape) return;
     newZones.push({id:uid(), type:sel.value, latlngs:shape.latlngs});
   });
-  const { error } = await supabaseClient.from('zones').insert(newZones.map(z=>({id:z.id, city:currentCity, type:z.type, latlngs:z.latlngs})));
-  if(error){ dbError('import stref KML', error); return; }
+  const rows = newZones.map(z=>({id:z.id, city:currentCity, type:z.type, latlngs:z.latlngs}));
+  const confirmBtn = document.getElementById('kml-import-confirm');
+  const cancelBtn = document.getElementById('kml-import-cancel');
+  const progressEl = document.getElementById('kml-import-progress');
+  const CHUNK_SIZE = 50;
+  confirmBtn.disabled = true;
+  cancelBtn.disabled = true;
+  progressEl.style.display = 'block';
+  const savedZones = [];
+  for(let i=0; i<rows.length; i+=CHUNK_SIZE){
+    progressEl.textContent = 'Zapisywanie ' + Math.min(i+CHUNK_SIZE, rows.length) + ' z ' + rows.length + ' stref...';
+    const chunk = rows.slice(i, i+CHUNK_SIZE);
+    const { error } = await supabaseClient.from('zones').insert(chunk);
+    if(error){
+      confirmBtn.disabled = false;
+      cancelBtn.disabled = false;
+      progressEl.style.display = 'none';
+      dbError('import stref KML (zapisano '+savedZones.length+' z '+rows.length+', reszta przerwana)', error);
+      if(savedZones.length){
+        if(!state.zones[currentCity]) state.zones[currentCity] = [];
+        state.zones[currentCity].push(...savedZones);
+        buildOverlaysForCity();
+      }
+      return;
+    }
+    savedZones.push(...newZones.slice(i, i+CHUNK_SIZE));
+  }
+  confirmBtn.disabled = false;
+  cancelBtn.disabled = false;
+  progressEl.style.display = 'none';
   if(!state.zones[currentCity]) state.zones[currentCity] = [];
   state.zones[currentCity].push(...newZones);
   flashSaved();
