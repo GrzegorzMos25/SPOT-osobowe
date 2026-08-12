@@ -392,7 +392,18 @@ const STATUS_COLOR = {aktywny:'#3b6d11', rozmowy:'#854f0b', typowany:'#6b6a64', 
 const STATUS_LABEL = {aktywny:'Aktywny', rozmowy:'W rozmowach', typowany:'Typowany', odrzucony:'Odrzucony'};
 
 let state = { parkings: [], targets: {...DEFAULT_TARGETS}, zones: {}, tasks: [] };
-let currentCity = Object.keys(CITIES)[0];
+const LAST_CITY_KEY = 'spoty_osobowe_last_city';
+function getInitialCity(){
+  try{
+    const saved = localStorage.getItem(LAST_CITY_KEY);
+    if(saved && CITIES[saved]) return saved;
+  }catch(e){}
+  return Object.keys(CITIES)[0];
+}
+function rememberCity(city){
+  try{ localStorage.setItem(LAST_CITY_KEY, city); }catch(e){}
+}
+let currentCity = getInitialCity();
 let chart;
 let calDate = new Date();
 const MONTH_NAMES = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
@@ -440,6 +451,10 @@ async function loadAll(){
     supabaseClient.from('zones').select('*'),
     supabaseClient.from('tasks').select('*')
   ]);
+  if(parkingsRes.error) dbError('wczytywanie parkingów', parkingsRes.error);
+  if(targetsRes.error) dbError('wczytywanie celów', targetsRes.error);
+  if(zonesRes.error) dbError('wczytywanie stref', zonesRes.error);
+  if(tasksRes.error) dbError('wczytywanie zadań', tasksRes.error);
   state.parkings = (parkingsRes.data||[]).map(rowToParking);
   state.targets = {...DEFAULT_TARGETS};
   (targetsRes.data||[]).forEach(r=>{ state.targets[r.city] = r.target; });
@@ -1225,6 +1240,7 @@ function initMapView(){
     tilesWrap.querySelectorAll('.city-tile-btn').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         currentCity = btn.dataset.city;
+        rememberCity(currentCity);
         tilesWrap.querySelectorAll('.city-tile-btn').forEach(b=>b.classList.toggle('active', b.dataset.city===currentCity));
         if(map){ cancelAnyMapAction(); map.setView(CITIES[currentCity], 12); buildOverlaysForCity(); }
       });
