@@ -1034,7 +1034,10 @@ function findZonesAt(lat, lng){
   const zones = state.zones[currentCity] || [];
   const matches = [];
   for(let i=zones.length-1; i>=0; i--){
-    if(pointInPolygon(lat, lng, zones[i].latlngs)) matches.push(zones[i]);
+    try{
+      const latlngs = zones[i].latlngs;
+      if(Array.isArray(latlngs) && latlngs.length>=3 && pointInPolygon(lat, lng, latlngs)) matches.push(zones[i]);
+    }catch(err){ /* pomiń uszkodzoną strefę */ }
   }
   return matches;
 }
@@ -1545,28 +1548,33 @@ function buildOverlaysForCity(){
   zonePolysOnMap.forEach(z=>map.removeLayer(z.layer));
   zonePolysOnMap = [];
   (state.zones[currentCity]||[]).forEach(z=>{
-    const style = ZONE_STYLES[z.type];
-    const visible = zoneVisibility[z.id] !== false;
-    const selected = exportSelectMode && exportSelectedIds.has(z.id);
-    const layer = L.polygon(z.latlngs, {color:style.color, fillColor:style.fillColor, fillOpacity: selected?0.35:0.15, weight: selected?5:2});
-    if(visible) layer.addTo(map);
-    layer.on('click', function(e){
-      if(polyMode || measureMode) return;
-      L.DomEvent.stopPropagation(e);
-      if(exportSelectMode){
-        if(exportSelectedIds.has(z.id)) exportSelectedIds.delete(z.id); else exportSelectedIds.add(z.id);
-        buildOverlaysForCity();
-        renderMapControls();
-        return;
-      }
-      const matches = findZonesAt(e.latlng.lat, e.latlng.lng);
-      if(matches.length > 1){
-        openLayerPicker(matches, openZoneActionOverlay);
-      } else {
-        openZoneActionOverlay(matches.length ? matches[0] : z);
-      }
-    });
-    zonePolysOnMap.push({id:z.id, layer});
+    try{
+      if(!Array.isArray(z.latlngs) || z.latlngs.length<3){ console.warn('Pominięto strefę z niepoprawną geometrią', z && z.id); return; }
+      const style = ZONE_STYLES[z.type] || ZONE_STYLES.wykluczona;
+      const visible = zoneVisibility[z.id] !== false;
+      const selected = exportSelectMode && exportSelectedIds.has(z.id);
+      const layer = L.polygon(z.latlngs, {color:style.color, fillColor:style.fillColor, fillOpacity: selected?0.35:0.15, weight: selected?5:2});
+      if(visible) layer.addTo(map);
+      layer.on('click', function(e){
+        if(polyMode || measureMode) return;
+        L.DomEvent.stopPropagation(e);
+        if(exportSelectMode){
+          if(exportSelectedIds.has(z.id)) exportSelectedIds.delete(z.id); else exportSelectedIds.add(z.id);
+          buildOverlaysForCity();
+          renderMapControls();
+          return;
+        }
+        const matches = findZonesAt(e.latlng.lat, e.latlng.lng);
+        if(matches.length > 1){
+          openLayerPicker(matches, openZoneActionOverlay);
+        } else {
+          openZoneActionOverlay(matches.length ? matches[0] : z);
+        }
+      });
+      zonePolysOnMap.push({id:z.id, layer});
+    }catch(err){
+      console.error('Pominięto uszkodzoną strefę', z && z.id, err);
+    }
   });
   renderZonesPanel();
   plotParkingMarkers();
