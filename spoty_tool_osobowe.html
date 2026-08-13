@@ -444,12 +444,24 @@ function rowToParking(r){
   };
 }
 function rowToZone(r){ return {id:r.id, type:r.type, latlngs:r.latlngs}; }
+async function fetchWithRetry(queryFn, retries, delayMs){
+  retries = retries===undefined ? 2 : retries;
+  delayMs = delayMs===undefined ? 500 : delayMs;
+  let res = await queryFn();
+  let attempt = 0;
+  while(res.error && res.error.code === 'PGRST303' && attempt < retries){
+    await new Promise(r=>setTimeout(r, delayMs));
+    res = await queryFn();
+    attempt++;
+  }
+  return res;
+}
 async function loadAll(){
   const [parkingsRes, targetsRes, zonesRes, tasksRes] = await Promise.all([
-    supabaseClient.from('parkings').select('*'),
-    supabaseClient.from('targets').select('*'),
-    supabaseClient.from('zones').select('*'),
-    supabaseClient.from('tasks').select('*')
+    fetchWithRetry(()=>supabaseClient.from('parkings').select('*')),
+    fetchWithRetry(()=>supabaseClient.from('targets').select('*')),
+    fetchWithRetry(()=>supabaseClient.from('zones').select('*')),
+    fetchWithRetry(()=>supabaseClient.from('tasks').select('*'))
   ]);
   if(parkingsRes.error) dbError('wczytywanie parkingów', parkingsRes.error);
   if(targetsRes.error) dbError('wczytywanie celów', targetsRes.error);
@@ -1436,7 +1448,10 @@ function cancelPoly(){
   if(wasEdit) buildOverlaysForCity();
 }
 async function finishPoly(){
-  if(polyVertexMarkers.length<3) return;
+  if(polyVertexMarkers.length<3){
+    alert('Strefa NIE została zapisana — postaw co najmniej 3 punkty przed kliknięciem "Zakończ" (masz: ' + polyVertexMarkers.length + ').');
+    return;
+  }
   const latlngs = polyVertexMarkers.map(m=>{ const ll=m.getLatLng(); return [ll.lat, ll.lng]; });
   if(polyMode==='draw'){
     const zoneId = uid();
