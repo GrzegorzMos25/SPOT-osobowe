@@ -456,11 +456,25 @@ async function fetchWithRetry(queryFn, retries, delayMs){
   }
   return res;
 }
+async function fetchAllRows(table){
+  const pageSize = 1000;
+  let from = 0;
+  let all = [];
+  while(true){
+    const res = await fetchWithRetry(()=>supabaseClient.from(table).select('*').range(from, from+pageSize-1));
+    if(res.error) return res;
+    const rows = res.data || [];
+    all = all.concat(rows);
+    if(rows.length < pageSize) break;
+    from += pageSize;
+  }
+  return {data: all, error: null};
+}
 async function loadAll(){
   const [parkingsRes, targetsRes, zonesRes, tasksRes] = await Promise.all([
     fetchWithRetry(()=>supabaseClient.from('parkings').select('*')),
     fetchWithRetry(()=>supabaseClient.from('targets').select('*')),
-    fetchWithRetry(()=>supabaseClient.from('zones').select('*')),
+    fetchAllRows('zones'),
     fetchWithRetry(()=>supabaseClient.from('tasks').select('*'))
   ]);
   if(parkingsRes.error) dbError('wczytywanie parkingów', parkingsRes.error);
