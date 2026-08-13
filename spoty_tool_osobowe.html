@@ -1890,17 +1890,25 @@ function renderCityParkingsBody(){
   tbody.querySelectorAll('.cpp-details-btn').forEach(b=>b.addEventListener('click', ()=>openDetailsModal(b.dataset.id)));
   tbody.querySelectorAll('.cpp-del-btn').forEach(b=>b.addEventListener('click', ()=>deleteParking(b.dataset.id)));
 }
-let ACTIVE_ICON = null;
-function activeIcon(){
-  if(!ACTIVE_ICON){
-    ACTIVE_ICON = L.icon({
-      iconUrl: 'logo-spot-icon.png',
-      iconSize: [40, 30],
-      iconAnchor: [20, 30],
-      popupAnchor: [0, -26]
+const PARKING_PIN_COLOR = '#03938a';
+const PARKING_PIN_ICONS = {};
+function parkingPinIcon(capacity){
+  const key = (capacity===null || capacity===undefined || capacity==='') ? '' : String(capacity);
+  if(!PARKING_PIN_ICONS[key]){
+    PARKING_PIN_ICONS[key] = L.divIcon({
+      className: 'parking-pin-wrap',
+      html: `<svg viewBox="0 0 120 100" width="46" height="40" xmlns="http://www.w3.org/2000/svg">
+        <rect x="2" y="2" width="116" height="62" rx="14" fill="${PARKING_PIN_COLOR}"/>
+        <polygon points="60,97 39,63 81,63" fill="${PARKING_PIN_COLOR}"/>
+        <text x="30" y="46" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="36" fill="#fff" text-anchor="middle">P</text>
+        <text x="84" y="43" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="24" fill="#fff" text-anchor="middle">${esc(key)}</text>
+      </svg>`,
+      iconSize: [46, 40],
+      iconAnchor: [23, 40],
+      popupAnchor: [0, -36]
     });
   }
-  return ACTIVE_ICON;
+  return PARKING_PIN_ICONS[key];
 }
 const STATUS_PIN_ICONS = {};
 function statusPinIcon(color){
@@ -1923,7 +1931,7 @@ function plotParkingMarkers(){
   state.parkings.filter(p=>p.city===currentCity && p.lat!=null && p.lng!=null).forEach(p=>{
     let m;
     if(p.status === 'aktywny'){
-      m = L.marker([p.lat,p.lng], {icon: activeIcon()}).addTo(map);
+      m = L.marker([p.lat,p.lng], {icon: parkingPinIcon(p.capacity)}).addTo(map);
     } else {
       const color = STATUS_COLOR[p.status] || '#6b6a64';
       m = L.marker([p.lat,p.lng], {icon: statusPinIcon(color)}).addTo(map);
@@ -1947,7 +1955,7 @@ function renderLegend(){
   const el = document.getElementById('m-legend');
   if(!el) return;
   el.innerHTML = `
-    <span><img src="logo-spot-icon.png" style="height:16px;vertical-align:-3px;margin-right:5px;">Aktywny</span>
+    <span><svg width="20" height="17" viewBox="0 0 120 100" style="vertical-align:-4px;margin-right:5px;"><rect x="2" y="2" width="116" height="62" rx="14" fill="${PARKING_PIN_COLOR}"/><polygon points="60,97 39,63 81,63" fill="${PARKING_PIN_COLOR}"/><text x="60" y="46" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="34" fill="#fff" text-anchor="middle">P</text></svg>Aktywny (liczba = miejsca)</span>
     <span><span class="status-pin" style="width:16px;height:16px;font-size:9px;border-width:1px;vertical-align:-3px;margin-right:5px;display:inline-flex;background:#854f0b;">P</span>W rozmowach</span>
     <span><span class="status-pin" style="width:16px;height:16px;font-size:9px;border-width:1px;vertical-align:-3px;margin-right:5px;display:inline-flex;background:#6b6a64;">P</span>Typowany</span>
     <span><span class="status-pin" style="width:16px;height:16px;font-size:9px;border-width:1px;vertical-align:-3px;margin-right:5px;display:inline-flex;background:#a32d2d;">P</span>Odrzucony</span>
