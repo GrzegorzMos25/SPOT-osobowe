@@ -139,6 +139,7 @@ body.map-maximized-active{overflow:hidden;}
     <button class="tab-btn" data-view="table">Baza parkingów</button>
     <button class="tab-btn" data-view="charts">Wykresy postępu</button>
     <button class="tab-btn" data-view="calendar">Kalendarz</button>
+    <button class="tab-btn" data-view="notes">Notatki</button>
     <button class="tab-btn" data-view="settings">Ustawienia</button>
   </div>
 
@@ -147,6 +148,7 @@ body.map-maximized-active{overflow:hidden;}
   <div id="view-table" class="view"></div>
   <div id="view-charts" class="view"></div>
   <div id="view-calendar" class="view"></div>
+  <div id="view-notes" class="view"></div>
   <div id="view-settings" class="view"></div>
 </div>
 
@@ -364,6 +366,25 @@ body.map-maximized-active{overflow:hidden;}
   </div>
 </div>
 
+<div class="overlay" id="note-overlay">
+  <div class="modal" style="width:520px;">
+    <h3 id="note-modal-title">Nowa notatka</h3>
+    <input type="hidden" id="nt-id">
+    <div class="field">
+      <label>Tytuł</label>
+      <input id="nt-title" placeholder="Tytuł notatki">
+    </div>
+    <div class="field">
+      <label>Treść</label>
+      <textarea id="nt-content" rows="8"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button id="nt-cancel">Anuluj</button>
+      <button class="primary" id="nt-save">Zapisz</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
@@ -391,7 +412,7 @@ const ZONE_STYLES = {
 const STATUS_COLOR = {aktywny:'#3b6d11', rozmowy:'#854f0b', typowany:'#6b6a64', odrzucony:'#a32d2d'};
 const STATUS_LABEL = {aktywny:'Aktywny', rozmowy:'W rozmowach', typowany:'Typowany', odrzucony:'Odrzucony'};
 
-let state = { parkings: [], targets: {...DEFAULT_TARGETS}, zones: {}, tasks: [] };
+let state = { parkings: [], targets: {...DEFAULT_TARGETS}, zones: {}, tasks: [], notes: [] };
 const LAST_CITY_KEY = 'spoty_osobowe_last_city';
 function getInitialCity(){
   try{
@@ -483,6 +504,7 @@ function rowToParking(r){
   };
 }
 function rowToZone(r){ return {id:r.id, type:r.type, latlngs:r.latlngs}; }
+function rowToNote(r){ return {id:r.id, title:r.title||'', content:r.content||'', createdAt:r.created_at||''}; }
 async function fetchWithRetry(queryFn, retries, delayMs){
   retries = retries===undefined ? 2 : retries;
   delayMs = delayMs===undefined ? 500 : delayMs;
@@ -510,16 +532,18 @@ async function fetchAllRows(table){
   return {data: all, error: null};
 }
 async function loadAll(){
-  const [parkingsRes, targetsRes, zonesRes, tasksRes] = await Promise.all([
+  const [parkingsRes, targetsRes, zonesRes, tasksRes, notesRes] = await Promise.all([
     fetchAllRows('parkings'),
     fetchAllRows('targets'),
     fetchAllRows('zones'),
-    fetchAllRows('tasks')
+    fetchAllRows('tasks'),
+    fetchAllRows('notes')
   ]);
   if(parkingsRes.error) dbError('wczytywanie parkingów', parkingsRes.error);
   if(targetsRes.error) dbError('wczytywanie celów', targetsRes.error);
   if(zonesRes.error) dbError('wczytywanie stref', zonesRes.error);
   if(tasksRes.error) dbError('wczytywanie zadań', tasksRes.error);
+  if(notesRes.error) dbError('wczytywanie notatek', notesRes.error);
   state.parkings = (parkingsRes.data||[]).map(rowToParking);
   state.targets = {...DEFAULT_TARGETS};
   (targetsRes.data||[]).forEach(r=>{ state.targets[r.city] = r.target; });
@@ -529,6 +553,7 @@ async function loadAll(){
     state.zones[r.city].push(rowToZone(r));
   });
   state.tasks = (tasksRes.data||[]).map(r=>({id:r.id, date:r.date, title:r.title, notes:r.notes||'', done:!!r.done}));
+  state.notes = (notesRes.data||[]).map(rowToNote);
 }
 function uid(){ return 'p' + Math.random().toString(36).slice(2,10); }
 function esc(s){ return (s||'').toString().replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
@@ -555,6 +580,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     if(v==='dashboard') renderDashboard();
     if(v==='table') renderTable();
     if(v==='calendar') renderCalendar();
+    if(v==='notes') renderNotes();
     if(v==='settings') renderSettings();
   });
 });
@@ -2272,6 +2298,96 @@ document.getElementById('tk-save').addEventListener('click', async ()=>{
   if(document.getElementById('view-dashboard').classList.contains('active')) renderDashboard();
 });
 
+/* ---------- NOTES ---------- */
+function formatNoteDate(iso){
+  const d = new Date(iso);
+  if(!iso || isNaN(d)) return '—';
+  return d.toLocaleDateString('pl-PL', {day:'numeric', month:'short', year:'numeric'}) + ' ' + d.toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
+}
+function sortedNotes(){
+  return [...state.notes].sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt));
+}
+function renderNotes(){
+  const el = document.getElementById('view-notes');
+  el.innerHTML = `
+    <div class="toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-left">
+        <button class="primary" id="nt-add">+ Nowa notatka</button>
+      </div>
+    </div>
+    <div class="card" style="padding:0;overflow-x:auto;">
+      <table class="tbl-fixed">
+        <colgroup>
+          <col style="width:60px"><col><col style="width:190px"><col style="width:150px">
+        </colgroup>
+        <tr><th>Lp.</th><th>Tytuł</th><th>Data utworzenia</th><th>Akcje</th></tr>
+        <tbody id="notes-body"></tbody>
+      </table>
+    </div>
+  `;
+  document.getElementById('nt-add').addEventListener('click', ()=>openNoteModal(null));
+  renderNotesBody();
+}
+function renderNotesBody(){
+  const body = document.getElementById('notes-body');
+  const rows = sortedNotes();
+  if(!rows.length){ body.innerHTML = `<tr><td colspan="4"><div class="empty">Brak notatek. Dodaj pierwszą.</div></td></tr>`; return; }
+  body.innerHTML = rows.map((n,i)=>`<tr>
+    <td>${i+1}</td>
+    <td class="cell-wrap">${esc(n.title||'Bez tytułu')}</td>
+    <td style="color:var(--ts);">${formatNoteDate(n.createdAt)}</td>
+    <td>
+      <div class="row-actions">
+        <button data-id="${n.id}" class="nt-edit-btn">Otwórz</button>
+        <button data-id="${n.id}" class="danger nt-del-btn">Usuń</button>
+      </div>
+    </td>
+  </tr>`).join('');
+  body.querySelectorAll('.nt-edit-btn').forEach(b=>b.addEventListener('click', ()=>openNoteModal(b.dataset.id)));
+  body.querySelectorAll('.nt-del-btn').forEach(b=>b.addEventListener('click', ()=>deleteNote(b.dataset.id)));
+}
+function openNoteModal(id){
+  const n = id? state.notes.find(x=>x.id===id) : null;
+  document.getElementById('note-modal-title').textContent = id? 'Edytuj notatkę' : 'Nowa notatka';
+  document.getElementById('nt-id').value = id||'';
+  document.getElementById('nt-title').value = n? n.title : '';
+  document.getElementById('nt-content').value = n? n.content : '';
+  document.getElementById('note-overlay').classList.add('show');
+}
+document.getElementById('nt-cancel').addEventListener('click', ()=>{
+  document.getElementById('note-overlay').classList.remove('show');
+});
+document.getElementById('nt-save').addEventListener('click', async ()=>{
+  const id = document.getElementById('nt-id').value;
+  const title = document.getElementById('nt-title').value.trim();
+  const content = document.getElementById('nt-content').value.trim();
+  if(!title && !content){ alert('Wpisz tytuł albo treść notatki.'); return; }
+  const existing = id? state.notes.find(x=>x.id===id) : null;
+  const rec = {
+    id: id || uid(),
+    title,
+    content,
+    createdAt: existing? existing.createdAt : new Date().toISOString()
+  };
+  const { error } = await supabaseClient.from('notes').upsert({id:rec.id, title:rec.title, content:rec.content, created_at:rec.createdAt});
+  if(error){ dbError('zapis notatki', error); return; }
+  if(id){ const idx = state.notes.findIndex(x=>x.id===id); state.notes[idx] = rec; }
+  else state.notes.push(rec);
+  flashSaved();
+  document.getElementById('note-overlay').classList.remove('show');
+  if(document.getElementById('view-notes').classList.contains('active')) renderNotesBody();
+});
+async function deleteNote(id){
+  const n = state.notes.find(x=>x.id===id);
+  if(!confirm(`Czy na pewno usunąć notatkę "${n? (n.title||'Bez tytułu') : ''}"? Tej operacji nie można cofnąć.`)) return;
+  const { error } = await supabaseClient.from('notes').delete().eq('id', id);
+  if(error){ dbError('usuwanie notatki', error); return; }
+  state.notes = state.notes.filter(x=>x.id!==id);
+  flashSaved();
+  if(document.getElementById('view-notes').classList.contains('active')) renderNotesBody();
+}
+
 /* ---------- SETTINGS ---------- */
 function renderSettings(){
   const el = document.getElementById('view-settings');
@@ -2312,14 +2428,15 @@ function renderSettings(){
   document.getElementById('backup-btn').addEventListener('click', exportFullBackup);
 }
 async function exportFullBackup(){
-  const [parkingsRes, targetsRes, zonesRes, tasksRes] = await Promise.all([
+  const [parkingsRes, targetsRes, zonesRes, tasksRes, notesRes] = await Promise.all([
     fetchAllRows('parkings'),
     fetchAllRows('targets'),
     fetchAllRows('zones'),
-    fetchAllRows('tasks')
+    fetchAllRows('tasks'),
+    fetchAllRows('notes')
   ]);
-  if(parkingsRes.error || targetsRes.error || zonesRes.error || tasksRes.error){
-    dbError('pobieranie kopii zapasowej', parkingsRes.error||targetsRes.error||zonesRes.error||tasksRes.error);
+  if(parkingsRes.error || targetsRes.error || zonesRes.error || tasksRes.error || notesRes.error){
+    dbError('pobieranie kopii zapasowej', parkingsRes.error||targetsRes.error||zonesRes.error||tasksRes.error||notesRes.error);
     return;
   }
   const backup = {
@@ -2327,7 +2444,8 @@ async function exportFullBackup(){
     parkings: parkingsRes.data||[],
     targets: targetsRes.data||[],
     zones: zonesRes.data||[],
-    tasks: tasksRes.data||[]
+    tasks: tasksRes.data||[],
+    notes: notesRes.data||[]
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
