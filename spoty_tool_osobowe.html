@@ -295,6 +295,7 @@ body.map-maximized-active{overflow:hidden;}
 </div>
 <input type="file" id="kml-file-input" accept=".kml" style="display:none;">
 <input type="file" id="excel-file-input" accept=".xlsx,.xls" style="display:none;">
+<input type="file" id="notes-file-input" accept=".xlsx,.xls,.doc,.docx" style="display:none;">
 
 <div class="overlay" id="zone-overlay">
   <div class="modal">
@@ -412,7 +413,7 @@ const ZONE_STYLES = {
 const STATUS_COLOR = {aktywny:'#3b6d11', rozmowy:'#854f0b', typowany:'#6b6a64', odrzucony:'#a32d2d'};
 const STATUS_LABEL = {aktywny:'Aktywny', rozmowy:'W rozmowach', typowany:'Typowany', odrzucony:'Odrzucony'};
 
-let state = { parkings: [], targets: {...DEFAULT_TARGETS}, zones: {}, tasks: [], notes: [] };
+let state = { parkings: [], targets: {...DEFAULT_TARGETS}, zones: {}, tasks: [], notes: [], files: [] };
 const LAST_CITY_KEY = 'spoty_osobowe_last_city';
 function getInitialCity(){
   try{
@@ -505,6 +506,7 @@ function rowToParking(r){
 }
 function rowToZone(r){ return {id:r.id, type:r.type, latlngs:r.latlngs}; }
 function rowToNote(r){ return {id:r.id, title:r.title||'', content:r.content||'', createdAt:r.created_at||''}; }
+function rowToFile(r){ return {id:r.id, name:r.name||'', size:r.size||0, contentType:r.content_type||'', storagePath:r.storage_path, createdAt:r.created_at||''}; }
 async function fetchWithRetry(queryFn, retries, delayMs){
   retries = retries===undefined ? 2 : retries;
   delayMs = delayMs===undefined ? 500 : delayMs;
@@ -532,18 +534,20 @@ async function fetchAllRows(table){
   return {data: all, error: null};
 }
 async function loadAll(){
-  const [parkingsRes, targetsRes, zonesRes, tasksRes, notesRes] = await Promise.all([
+  const [parkingsRes, targetsRes, zonesRes, tasksRes, notesRes, filesRes] = await Promise.all([
     fetchAllRows('parkings'),
     fetchAllRows('targets'),
     fetchAllRows('zones'),
     fetchAllRows('tasks'),
-    fetchAllRows('notes')
+    fetchAllRows('notes'),
+    fetchAllRows('files')
   ]);
   if(parkingsRes.error) dbError('wczytywanie parkingów', parkingsRes.error);
   if(targetsRes.error) dbError('wczytywanie celów', targetsRes.error);
   if(zonesRes.error) dbError('wczytywanie stref', zonesRes.error);
   if(tasksRes.error) dbError('wczytywanie zadań', tasksRes.error);
   if(notesRes.error) dbError('wczytywanie notatek', notesRes.error);
+  if(filesRes.error) dbError('wczytywanie plików', filesRes.error);
   state.parkings = (parkingsRes.data||[]).map(rowToParking);
   state.targets = {...DEFAULT_TARGETS};
   (targetsRes.data||[]).forEach(r=>{ state.targets[r.city] = r.target; });
@@ -554,6 +558,7 @@ async function loadAll(){
   });
   state.tasks = (tasksRes.data||[]).map(r=>({id:r.id, date:r.date, title:r.title, notes:r.notes||'', done:!!r.done}));
   state.notes = (notesRes.data||[]).map(rowToNote);
+  state.files = (filesRes.data||[]).map(rowToFile);
 }
 function uid(){ return 'p' + Math.random().toString(36).slice(2,10); }
 function esc(s){ return (s||'').toString().replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
@@ -2310,13 +2315,14 @@ function sortedNotes(){
 function renderNotes(){
   const el = document.getElementById('view-notes');
   el.innerHTML = `
+    <p class="section-title">Notatki</p>
     <div class="toolbar">
       <div class="toolbar-left"></div>
       <div class="toolbar-left">
         <button class="primary" id="nt-add">+ Nowa notatka</button>
       </div>
     </div>
-    <div class="card" style="padding:0;overflow-x:auto;">
+    <div class="card" style="padding:0;overflow-x:auto;margin-bottom:24px;">
       <table class="tbl-fixed">
         <colgroup>
           <col style="width:60px"><col><col style="width:190px"><col style="width:150px">
@@ -2325,9 +2331,115 @@ function renderNotes(){
         <tbody id="notes-body"></tbody>
       </table>
     </div>
+
+    <p class="section-title">Pliki (Excel, Word)</p>
+    <div class="toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-left">
+        <span class="save-flash" id="files-save-flash">Zapisano</span>
+        <span class="hint" id="nt-upload-progress"></span>
+        <button class="primary" id="nt-file-add">⬆️ Wgraj plik</button>
+      </div>
+    </div>
+    <div class="card" style="padding:0;overflow-x:auto;">
+      <table class="tbl-fixed">
+        <colgroup>
+          <col><col style="width:110px"><col style="width:190px"><col style="width:150px">
+        </colgroup>
+        <tr><th>Nazwa pliku</th><th>Rozmiar</th><th>Data dodania</th><th>Akcje</th></tr>
+        <tbody id="files-body"></tbody>
+      </table>
+    </div>
   `;
   document.getElementById('nt-add').addEventListener('click', ()=>openNoteModal(null));
+  document.getElementById('nt-file-add').addEventListener('click', ()=> document.getElementById('notes-file-input').click());
   renderNotesBody();
+  renderFilesBody();
+}
+function formatFileSize(bytes){
+  bytes = Number(bytes)||0;
+  if(bytes < 1024) return bytes + ' B';
+  if(bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/1024/1024).toFixed(1) + ' MB';
+}
+function renderFilesBody(){
+  const body = document.getElementById('files-body');
+  if(!body) return;
+  const rows = [...state.files].sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt));
+  if(!rows.length){ body.innerHTML = `<tr><td colspan="4"><div class="empty">Brak wgranych plików.</div></td></tr>`; return; }
+  body.innerHTML = rows.map(f=>`<tr>
+    <td class="cell-wrap">${esc(f.name)}</td>
+    <td style="color:var(--ts);">${formatFileSize(f.size)}</td>
+    <td style="color:var(--ts);">${formatNoteDate(f.createdAt)}</td>
+    <td>
+      <div class="row-actions">
+        <button data-id="${f.id}" class="file-dl-btn">Pobierz</button>
+        <button data-id="${f.id}" class="danger file-del-btn">Usuń</button>
+      </div>
+    </td>
+  </tr>`).join('');
+  body.querySelectorAll('.file-dl-btn').forEach(b=>b.addEventListener('click', ()=>downloadFile(b.dataset.id)));
+  body.querySelectorAll('.file-del-btn').forEach(b=>b.addEventListener('click', ()=>deleteFile(b.dataset.id)));
+}
+function filesFlashSaved(){
+  const el = document.getElementById('files-save-flash');
+  if(!el) return;
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), 1200);
+}
+document.getElementById('notes-file-input').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const progressEl = document.getElementById('nt-upload-progress');
+  if(progressEl) progressEl.textContent = 'Wgrywanie „' + file.name + '"...';
+  const id = uid();
+  const storagePath = id + '_' + file.name;
+  const { error: upErr } = await supabaseClient.storage.from('attachments').upload(storagePath, file);
+  if(upErr){
+    if(progressEl) progressEl.textContent = '';
+    dbError('wgrywanie pliku', upErr);
+    e.target.value = '';
+    return;
+  }
+  const rec = { id, name: file.name, size: file.size, contentType: file.type||'', storagePath, createdAt: new Date().toISOString() };
+  const { error: insErr } = await supabaseClient.from('files').upsert({
+    id: rec.id, name: rec.name, size: rec.size, content_type: rec.contentType, storage_path: rec.storagePath, created_at: rec.createdAt
+  });
+  if(insErr){
+    if(progressEl) progressEl.textContent = '';
+    await supabaseClient.storage.from('attachments').remove([storagePath]);
+    dbError('zapis metadanych pliku', insErr);
+    e.target.value = '';
+    return;
+  }
+  state.files.push(rec);
+  if(progressEl) progressEl.textContent = '';
+  filesFlashSaved();
+  e.target.value = '';
+  if(document.getElementById('view-notes').classList.contains('active')) renderFilesBody();
+});
+async function downloadFile(id){
+  const f = state.files.find(x=>x.id===id);
+  if(!f) return;
+  const { data, error } = await supabaseClient.storage.from('attachments').download(f.storagePath);
+  if(error){ dbError('pobieranie pliku', error); return; }
+  const url = URL.createObjectURL(data);
+  const a = document.createElement('a');
+  a.href = url; a.download = f.name;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+async function deleteFile(id){
+  const f = state.files.find(x=>x.id===id);
+  if(!f) return;
+  if(!confirm(`Czy na pewno usunąć plik "${f.name}"? Tej operacji nie można cofnąć.`)) return;
+  const { error: rmErr } = await supabaseClient.storage.from('attachments').remove([f.storagePath]);
+  if(rmErr){ dbError('usuwanie pliku z magazynu', rmErr); return; }
+  const { error: delErr } = await supabaseClient.from('files').delete().eq('id', id);
+  if(delErr){ dbError('usuwanie metadanych pliku', delErr); return; }
+  state.files = state.files.filter(x=>x.id!==id);
+  filesFlashSaved();
+  if(document.getElementById('view-notes').classList.contains('active')) renderFilesBody();
 }
 function renderNotesBody(){
   const body = document.getElementById('notes-body');
@@ -2428,15 +2540,16 @@ function renderSettings(){
   document.getElementById('backup-btn').addEventListener('click', exportFullBackup);
 }
 async function exportFullBackup(){
-  const [parkingsRes, targetsRes, zonesRes, tasksRes, notesRes] = await Promise.all([
+  const [parkingsRes, targetsRes, zonesRes, tasksRes, notesRes, filesRes] = await Promise.all([
     fetchAllRows('parkings'),
     fetchAllRows('targets'),
     fetchAllRows('zones'),
     fetchAllRows('tasks'),
-    fetchAllRows('notes')
+    fetchAllRows('notes'),
+    fetchAllRows('files')
   ]);
-  if(parkingsRes.error || targetsRes.error || zonesRes.error || tasksRes.error || notesRes.error){
-    dbError('pobieranie kopii zapasowej', parkingsRes.error||targetsRes.error||zonesRes.error||tasksRes.error||notesRes.error);
+  if(parkingsRes.error || targetsRes.error || zonesRes.error || tasksRes.error || notesRes.error || filesRes.error){
+    dbError('pobieranie kopii zapasowej', parkingsRes.error||targetsRes.error||zonesRes.error||tasksRes.error||notesRes.error||filesRes.error);
     return;
   }
   const backup = {
@@ -2445,7 +2558,8 @@ async function exportFullBackup(){
     targets: targetsRes.data||[],
     zones: zonesRes.data||[],
     tasks: tasksRes.data||[],
-    notes: notesRes.data||[]
+    notes: notesRes.data||[],
+    files: filesRes.data||[]
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
