@@ -472,10 +472,10 @@ async function fetchAllRows(table){
 }
 async function loadAll(){
   const [parkingsRes, targetsRes, zonesRes, tasksRes] = await Promise.all([
-    fetchWithRetry(()=>supabaseClient.from('parkings').select('*')),
-    fetchWithRetry(()=>supabaseClient.from('targets').select('*')),
+    fetchAllRows('parkings'),
+    fetchAllRows('targets'),
     fetchAllRows('zones'),
-    fetchWithRetry(()=>supabaseClient.from('tasks').select('*'))
+    fetchAllRows('tasks')
   ]);
   if(parkingsRes.error) dbError('wczytywanie parkingów', parkingsRes.error);
   if(targetsRes.error) dbError('wczytywanie celów', targetsRes.error);
@@ -1287,10 +1287,10 @@ function initMapView(){
 
 function buildMap(){
   map = L.map('map').setView(CITIES[currentCity], 12);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-    maxZoom: 20,
-    subdomains: 'abcd'
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19,
+    subdomains: 'abc'
   }).addTo(map);
 
   map.on('click', function(e){
@@ -2271,10 +2271,10 @@ function renderSettings(){
 }
 async function exportFullBackup(){
   const [parkingsRes, targetsRes, zonesRes, tasksRes] = await Promise.all([
-    supabaseClient.from('parkings').select('*'),
-    supabaseClient.from('targets').select('*'),
-    supabaseClient.from('zones').select('*'),
-    supabaseClient.from('tasks').select('*')
+    fetchAllRows('parkings'),
+    fetchAllRows('targets'),
+    fetchAllRows('zones'),
+    fetchAllRows('tasks')
   ]);
   if(parkingsRes.error || targetsRes.error || zonesRes.error || tasksRes.error){
     dbError('pobieranie kopii zapasowej', parkingsRes.error||targetsRes.error||zonesRes.error||tasksRes.error);
