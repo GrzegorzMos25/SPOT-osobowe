@@ -404,6 +404,45 @@ function rememberCity(city){
   try{ localStorage.setItem(LAST_CITY_KEY, city); }catch(e){}
 }
 let currentCity = getInitialCity();
+
+const MAP_STYLES = {
+  minimal: {
+    label: 'Uproszczona (mało szczegółów)',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    options: { attribution: '&copy; Esri, DeLorme, NAVTEQ', maxZoom: 16 }
+  },
+  osm: {
+    label: 'Standardowa (OSM)',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    options: { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19, subdomains: 'abc' }
+  },
+  satellite: {
+    label: 'Satelitarna',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    options: { attribution: '&copy; Esri, Maxar, Earthstar Geographics', maxZoom: 19 }
+  }
+};
+const LAST_MAP_STYLE_KEY = 'spoty_osobowe_last_map_style';
+function getInitialMapStyle(){
+  try{
+    const saved = localStorage.getItem(LAST_MAP_STYLE_KEY);
+    if(saved && MAP_STYLES[saved]) return saved;
+  }catch(e){}
+  return 'minimal';
+}
+function rememberMapStyle(styleKey){
+  try{ localStorage.setItem(LAST_MAP_STYLE_KEY, styleKey); }catch(e){}
+}
+let currentMapStyle = getInitialMapStyle();
+let tileLayer = null;
+function setMapStyle(styleKey){
+  const style = MAP_STYLES[styleKey];
+  if(!style || !map) return;
+  currentMapStyle = styleKey;
+  rememberMapStyle(styleKey);
+  if(tileLayer) map.removeLayer(tileLayer);
+  tileLayer = L.tileLayer(style.url, style.options).addTo(map);
+}
 let chart;
 let calDate = new Date();
 const MONTH_NAMES = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
@@ -1238,6 +1277,10 @@ function initMapView(){
       <div id="map-fullscreen-wrap">
         <div class="toolbar">
           <div class="toolbar-left" id="m-city-tiles"></div>
+          <div class="toolbar-left">
+            <label class="hint" for="m-style-select">Widok mapy:</label>
+            <select id="m-style-select"></select>
+          </div>
           <div class="toolbar-left" id="m-draw-controls"></div>
         </div>
         <p class="hint" id="m-hint" style="margin:0 0 10px;"></p>
@@ -1262,6 +1305,9 @@ function initMapView(){
       </div>
     `;
     el.dataset.built = '1';
+    const styleSelect = document.getElementById('m-style-select');
+    styleSelect.innerHTML = Object.keys(MAP_STYLES).map(k=>`<option value="${k}" ${k===currentMapStyle?'selected':''}>${MAP_STYLES[k].label}</option>`).join('');
+    styleSelect.addEventListener('change', ()=> setMapStyle(styleSelect.value));
     const tilesWrap = document.getElementById('m-city-tiles');
     tilesWrap.innerHTML = Object.keys(CITIES).map(c=>`<button class="city-tile-btn${c===currentCity?' active':''}" data-city="${c}">${c}</button>`).join('');
     tilesWrap.querySelectorAll('.city-tile-btn').forEach(btn=>{
@@ -1287,11 +1333,7 @@ function initMapView(){
 
 function buildMap(){
   map = L.map('map').setView(CITIES[currentCity], 12);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors',
-    maxZoom: 19,
-    subdomains: 'abc'
-  }).addTo(map);
+  setMapStyle(currentMapStyle);
 
   map.on('click', function(e){
     if(measureMode){ addMeasurePoint(e.latlng); return; }
