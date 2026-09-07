@@ -1294,6 +1294,44 @@ function showMapContextMenu(screenX, screenY, latlng){
   document.getElementById('cm-cancel').addEventListener('click', closeMapContextMenu);
 }
 
+/* --- address search (OpenStreetMap Nominatim, no API key) --- */
+let searchResultMarker = null;
+function searchResultIcon(){
+  return L.divIcon({className:'vertex-handle', iconSize:[16,16], iconAnchor:[8,8]});
+}
+function clearSearchResult(){
+  if(searchResultMarker){ map.removeLayer(searchResultMarker); searchResultMarker = null; }
+}
+async function searchAddress(){
+  const input = document.getElementById('m-search-input');
+  const btn = document.getElementById('m-search-btn');
+  const query = input.value.trim();
+  if(!query) return;
+  const center = CITIES[currentCity];
+  const delta = 0.6;
+  const viewbox = [center[1]-delta, center[0]+delta, center[1]+delta, center[0]-delta].join(',');
+  const prevLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Szukam...';
+  try{
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=pl&viewbox=' + viewbox + '&bounded=0&q=' + encodeURIComponent(query);
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    const results = await res.json();
+    if(!results.length){ alert('Nie znaleziono lokalizacji dla: "' + query + '".'); return; }
+    const lat = parseFloat(results[0].lat), lon = parseFloat(results[0].lon);
+    clearSearchResult();
+    searchResultMarker = L.marker([lat, lon], { icon: searchResultIcon() }).addTo(map)
+      .bindPopup(esc(results[0].display_name)).openPopup();
+    map.setView([lat, lon], 17);
+  }catch(err){
+    console.error(err);
+    alert('Nie udało się wyszukać adresu. Sprawdź połączenie z internetem i spróbuj ponownie.');
+  }finally{
+    btn.disabled = false;
+    btn.textContent = prevLabel;
+  }
+}
+
 function vertexIcon(){
   return L.divIcon({className:'vertex-handle', iconSize:[14,14], iconAnchor:[7,7]});
 }
@@ -1308,6 +1346,10 @@ function initMapView(){
       <div id="map-fullscreen-wrap">
         <div class="toolbar">
           <div class="toolbar-left" id="m-city-tiles"></div>
+          <div class="toolbar-left">
+            <input id="m-search-input" placeholder="Szukaj adresu..." style="width:220px;">
+            <button id="m-search-btn">🔍 Szukaj</button>
+          </div>
           <div class="toolbar-left">
             <label class="hint" for="m-style-select">Widok mapy:</label>
             <select id="m-style-select"></select>
@@ -1346,8 +1388,12 @@ function initMapView(){
         currentCity = btn.dataset.city;
         rememberCity(currentCity);
         tilesWrap.querySelectorAll('.city-tile-btn').forEach(b=>b.classList.toggle('active', b.dataset.city===currentCity));
-        if(map){ cancelAnyMapAction(); map.setView(CITIES[currentCity], 12); buildOverlaysForCity(); }
+        if(map){ cancelAnyMapAction(); clearSearchResult(); map.setView(CITIES[currentCity], 12); buildOverlaysForCity(); }
       });
+    });
+    document.getElementById('m-search-btn').addEventListener('click', searchAddress);
+    document.getElementById('m-search-input').addEventListener('keydown', e=>{
+      if(e.key==='Enter'){ e.preventDefault(); searchAddress(); }
     });
     renderMapControls();
     renderLegend();
