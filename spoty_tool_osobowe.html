@@ -71,6 +71,10 @@ button.danger{color:var(--dang);}
 .pill.odrzucony{background:var(--bgdang);color:var(--dang);}
 .pill.skycash-on{background:var(--bgdang);color:var(--dang);}
 .pill.skycash-off{background:var(--bgsucc);color:var(--succ);}
+.pill.osobowe{background:var(--bgacc);color:var(--acc);}
+.pill.dostawcze{background:#dde4f2;color:#1e3a5f;}
+.sort-th{cursor:pointer;user-select:none;}
+.sort-th:hover{color:var(--tp);}
 .toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;justify-content:space-between;}
 .toolbar-left{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:2500;overflow-y:auto;}
@@ -174,6 +178,13 @@ body.map-maximized-active{overflow:hidden;}
           <option value="odrzucony">Odrzucony</option>
         </select>
       </div>
+    </div>
+    <div class="field">
+      <label>Rodzaj parkingu</label>
+      <select id="f-vehicle-type">
+        <option value="osobowe">Osobowe</option>
+        <option value="dostawcze">Dostawcze</option>
+      </select>
     </div>
     <div class="field">
       <label>Adres</label>
@@ -412,6 +423,7 @@ const ZONE_STYLES = {
 };
 const STATUS_COLOR = {aktywny:'#3b6d11', rozmowy:'#854f0b', typowany:'#6b6a64', odrzucony:'#a32d2d'};
 const STATUS_LABEL = {aktywny:'Aktywny', rozmowy:'W rozmowach', typowany:'Typowany', odrzucony:'Odrzucony'};
+const VEHICLE_TYPE_LABEL = {osobowe:'Osobowe', dostawcze:'Dostawcze'};
 
 let state = { parkings: [], targets: {...DEFAULT_TARGETS}, zones: {}, tasks: [], notes: [], files: [] };
 const LAST_CITY_KEY = 'spoty_osobowe_last_city';
@@ -492,7 +504,8 @@ function parkingToRow(p){
     lat: (p.lat===undefined?null:p.lat), lng: (p.lng===undefined?null:p.lng),
     contract_end: p.contractEnd || null, skycash: p.skycash||'wlaczony', complete: !!p.complete,
     notes: p.notes||'', description: p.description||'', manager: p.manager||'',
-    contract_id: p.contractId||'', required_action: p.requiredAction||'', photo: p.photo||null
+    contract_id: p.contractId||'', required_action: p.requiredAction||'', photo: p.photo||null,
+    vehicle_type: p.vehicleType||'osobowe'
   };
 }
 function rowToParking(r){
@@ -501,7 +514,8 @@ function rowToParking(r){
     capacity: r.capacity||0, cost: r.cost||0, lat: r.lat, lng: r.lng,
     contractEnd: r.contract_end||'', skycash: r.skycash||'wlaczony', complete: !!r.complete,
     notes: r.notes||'', description: r.description||'', manager: r.manager||'',
-    contractId: r.contract_id||'', requiredAction: r.required_action||'', photo: r.photo||null
+    contractId: r.contract_id||'', requiredAction: r.required_action||'', photo: r.photo||null,
+    vehicleType: r.vehicle_type||'osobowe'
   };
 }
 function rowToZone(r){ return {id:r.id, type:r.type, latlngs:r.latlngs}; }
@@ -686,8 +700,9 @@ async function downloadProgressImage(){
 }
 
 /* ---------- TABLE ---------- */
-const EMPTY_TABLE_FILTER = { name:'', city:'', address:'', capacity:'', cost:'', costPerSpot:'', status:'', skycash:'', contract:'' };
+const EMPTY_TABLE_FILTER = { name:'', city:'', vehicleType:'', address:'', capacity:'', cost:'', costPerSpot:'', status:'', skycash:'', contract:'' };
 let editFilter = {...EMPTY_TABLE_FILTER};
+let vehicleTypeSort = null; // null | 'asc' | 'desc'
 function renderTable(){
   const el = document.getElementById('view-table');
   el.innerHTML = `
@@ -706,17 +721,18 @@ function renderTable(){
     <div class="card" style="padding:0;overflow-x:auto;">
       <table class="tbl-fixed">
         <colgroup>
-          <col style="width:220px"><col style="width:90px"><col style="width:210px">
+          <col style="width:220px"><col style="width:90px"><col style="width:100px"><col style="width:190px">
           <col style="width:60px"><col style="width:80px"><col style="width:90px">
           <col style="width:85px"><col style="width:75px"><col style="width:120px"><col style="width:110px">
         </colgroup>
         <tr>
-          <th>Nazwa parkingu</th><th>Miasto</th><th>Adres</th><th>Miejsca</th>
+          <th>Nazwa parkingu</th><th>Miasto</th><th id="th-vehicle-type" class="sort-th" title="Kliknij, żeby sortować">Rodzaj${vehicleTypeSort? (vehicleTypeSort==='asc'?' ▲':' ▼') : ''}</th><th>Adres</th><th>Miejsca</th>
           <th>Koszt/mc</th><th>Koszt/miejsce</th><th>Status</th><th>SkyCash</th><th>Umowa do</th><th>Akcje</th>
         </tr>
         <tr class="filter-row">
           <th><input id="tf-name" placeholder="Szukaj..." value="${esc(editFilter.name)}"></th>
           <th><select id="tf-city"><option value="">Wszystkie</option>${Object.keys(CITIES).map(c=>`<option ${editFilter.city===c?'selected':''}>${c}</option>`).join('')}</select></th>
+          <th><select id="tf-vehicleType"><option value="">Wszystkie</option>${Object.entries(VEHICLE_TYPE_LABEL).map(([k,v])=>`<option value="${k}" ${editFilter.vehicleType===k?'selected':''}>${v}</option>`).join('')}</select></th>
           <th><input id="tf-address" placeholder="Szukaj..." value="${esc(editFilter.address)}"></th>
           <th><input id="tf-capacity" placeholder="Szukaj..." value="${esc(editFilter.capacity)}"></th>
           <th><input id="tf-cost" placeholder="Szukaj..." value="${esc(editFilter.cost)}"></th>
@@ -734,6 +750,7 @@ function renderTable(){
   const bindSelect = (id, key) => document.getElementById(id).addEventListener('change', e=>{ editFilter[key]=e.target.value; renderTableBody(); });
   bindText('tf-name','name');
   bindSelect('tf-city','city');
+  bindSelect('tf-vehicleType','vehicleType');
   bindText('tf-address','address');
   bindText('tf-capacity','capacity');
   bindText('tf-cost','cost');
@@ -741,6 +758,10 @@ function renderTable(){
   bindSelect('tf-status','status');
   bindSelect('tf-skycash','skycash');
   bindText('tf-contract','contract');
+  document.getElementById('th-vehicle-type').addEventListener('click', ()=>{
+    vehicleTypeSort = vehicleTypeSort==='asc' ? 'desc' : (vehicleTypeSort==='desc' ? null : 'asc');
+    renderTable();
+  });
   document.getElementById('t-clear-filters').addEventListener('click', ()=>{ editFilter = {...EMPTY_TABLE_FILTER}; renderTable(); });
   document.getElementById('t-add').addEventListener('click', ()=>openParkingModal(null));
   document.getElementById('t-export').addEventListener('click', exportExcel);
@@ -749,10 +770,11 @@ function renderTable(){
   renderTableBody();
 }
 function filteredParkings(){
-  return state.parkings.filter(p=>{
+  let rows = state.parkings.filter(p=>{
     const perSpot = p.capacity>0 ? Math.round(Number(p.cost||0)/Number(p.capacity)) : 0;
     if(editFilter.name && !(p.name||'').toLowerCase().includes(editFilter.name.toLowerCase())) return false;
     if(editFilter.city && p.city!==editFilter.city) return false;
+    if(editFilter.vehicleType && (p.vehicleType||'osobowe')!==editFilter.vehicleType) return false;
     if(editFilter.address && !(p.address||'').toLowerCase().includes(editFilter.address.toLowerCase())) return false;
     if(editFilter.capacity && !String(p.capacity||0).includes(editFilter.capacity)) return false;
     if(editFilter.cost && !String(p.cost||0).includes(editFilter.cost)) return false;
@@ -762,20 +784,30 @@ function filteredParkings(){
     if(editFilter.contract && !(p.contractEnd||'').includes(editFilter.contract)) return false;
     return true;
   });
+  if(vehicleTypeSort){
+    const order = {osobowe:0, dostawcze:1};
+    rows = [...rows].sort((a,b)=>{
+      const av = order[a.vehicleType||'osobowe']||0, bv = order[b.vehicleType||'osobowe']||0;
+      return vehicleTypeSort==='asc' ? av-bv : bv-av;
+    });
+  }
+  return rows;
 }
 function renderTableBody(){
   const body = document.getElementById('t-body');
   const rows = filteredParkings();
-  if(!rows.length){ body.innerHTML = `<tr><td colspan="10"><div class="empty">Brak parkingów spełniających filtry. Dodaj pierwszy rekord.</div></td></tr>`; return; }
+  if(!rows.length){ body.innerHTML = `<tr><td colspan="11"><div class="empty">Brak parkingów spełniających filtry. Dodaj pierwszy rekord.</div></td></tr>`; return; }
   body.innerHTML = rows.map(p=>{
     const perSpot = p.capacity>0 ? Math.round(Number(p.cost||0)/Number(p.capacity)) : 0;
     const skyOn = (p.skycash||'wlaczony')==='wlaczony';
+    const vType = p.vehicleType||'osobowe';
     const completeIcon = p.complete
       ? `<span class="complete-flag" title="Parking kompletny" style="color:var(--succ);">✅</span>`
       : `<span class="complete-flag" title="Wymagana akcja" style="color:#c9860a;">⚠️</span>`;
     return `<tr>
       <td class="cell-wrap">${esc(p.name)}</td>
       <td>${esc(p.city)}</td>
+      <td><span class="pill ${vType}">${VEHICLE_TYPE_LABEL[vType]}</span></td>
       <td class="cell-wrap" style="color:var(--ts);">${esc(p.address||'')}</td>
       <td>${p.capacity||0}</td>
       <td>${Number(p.cost||0).toLocaleString('pl-PL')} zł</td>
@@ -835,6 +867,7 @@ function openParkingModal(id, prefill){
   document.getElementById('f-name').value = p.name||'';
   document.getElementById('f-city').value = p.city||currentCity;
   document.getElementById('f-status').value = p.status||'typowany';
+  document.getElementById('f-vehicle-type').value = p.vehicleType||'osobowe';
   document.getElementById('f-address').value = p.address||'';
   document.getElementById('f-capacity').value = p.capacity||'';
   document.getElementById('f-cost').value = p.cost||'';
@@ -871,6 +904,7 @@ document.getElementById('f-save').addEventListener('click', async ()=>{
     name: document.getElementById('f-name').value.trim() || 'Bez nazwy',
     city: document.getElementById('f-city').value,
     status: document.getElementById('f-status').value,
+    vehicleType: document.getElementById('f-vehicle-type').value,
     address: document.getElementById('f-address').value.trim(),
     capacity: Number(document.getElementById('f-capacity').value)||0,
     cost: Number(document.getElementById('f-cost').value)||0,
@@ -905,8 +939,10 @@ document.getElementById('f-save').addEventListener('click', async ()=>{
 function renderDetailsQuickFacts(p){
   const perSpot = p.capacity>0 ? Math.round(Number(p.cost||0)/Number(p.capacity)) : 0;
   const skyOn = (p.skycash||'wlaczony')==='wlaczony';
+  const vType = p.vehicleType||'osobowe';
   const rows = [
     ['Miasto', esc(p.city)],
+    ['Rodzaj parkingu', `<span class="pill ${vType}">${VEHICLE_TYPE_LABEL[vType]}</span>`],
     ['Adres', esc(p.address||'—')],
     ['Status', `<span class="pill ${p.status}">${STATUS_LABEL[p.status]}</span>`],
     ['SkyCash', `<span class="pill ${skyOn?'skycash-on':'skycash-off'}">${skyOn?'Włączony':'Wyłączony'}</span>`],
@@ -995,7 +1031,7 @@ async function deleteParking(id){
 }
 function exportExcel(){
   const rows = state.parkings.map(p=>({
-    'Nazwa parkingu': p.name, 'Miasto': p.city, 'Adres': p.address,
+    'Nazwa parkingu': p.name, 'Miasto': p.city, 'Rodzaj parkingu': VEHICLE_TYPE_LABEL[p.vehicleType||'osobowe'], 'Adres': p.address,
     'Liczba miejsc': p.capacity, 'Koszt miesięczny (zł)': p.cost,
     'Koszt na miejsce (zł)': p.capacity? Math.round(p.cost/p.capacity):0,
     'Status': STATUS_LABEL[p.status], 'SkyCash': (p.skycash||'wlaczony')==='wlaczony'?'Włączony':'Wyłączony',
@@ -1009,7 +1045,7 @@ function exportExcel(){
 }
 function exportExcelFull(){
   const rows = state.parkings.map(p=>({
-    'Nazwa parkingu': p.name, 'Miasto': p.city, 'Adres': p.address,
+    'Nazwa parkingu': p.name, 'Miasto': p.city, 'Rodzaj parkingu': VEHICLE_TYPE_LABEL[p.vehicleType||'osobowe'], 'Adres': p.address,
     'Liczba miejsc': p.capacity, 'Koszt miesięczny (zł)': p.cost,
     'Koszt na miejsce (zł)': p.capacity? Math.round(p.cost/p.capacity):0,
     'Status': STATUS_LABEL[p.status], 'SkyCash': (p.skycash||'wlaczony')==='wlaczony'?'Włączony':'Wyłączony',
@@ -1028,6 +1064,7 @@ function exportExcelFull(){
 
 /* --- import z Excela (odtwarza wszystko z "Baza parkingów", w tym punkty na mapie ze współrzędnych) --- */
 const STATUS_LABEL_REVERSE = Object.fromEntries(Object.entries(STATUS_LABEL).map(([k,v])=>[v,k]));
+const VEHICLE_TYPE_LABEL_REVERSE = Object.fromEntries(Object.entries(VEHICLE_TYPE_LABEL).map(([k,v])=>[v,k]));
 function excelDateToStr(v){
   if(v===null || v===undefined || v==='') return '';
   if(v instanceof Date) return toDateStr(v);
@@ -1043,12 +1080,14 @@ function parseImportedRow(row){
   const statusLabel = (row['Status']||'').toString().trim();
   const skycashLabel = (row['SkyCash']||'').toString().trim();
   const completeLabel = (row['Kompletność']||'').toString().trim();
+  const vehicleTypeLabel = (row['Rodzaj parkingu']||'').toString().trim();
   const latRaw = row['Szerokość geo.'];
   const lngRaw = row['Długość geo.'];
   return {
     id: uid(),
     name: (row['Nazwa parkingu']||row['Lokalizacja']||'Bez nazwy').toString().trim(),
     city: cityMatch || cityRaw || currentCity,
+    vehicleType: VEHICLE_TYPE_LABEL_REVERSE[vehicleTypeLabel] || 'osobowe',
     address: (row['Adres']||'').toString().trim(),
     capacity: Number(row['Liczba miejsc'])||0,
     cost: Number(row['Koszt miesięczny (zł)'])||0,
@@ -1997,11 +2036,13 @@ document.getElementById('kml-import-confirm').addEventListener('click', async ()
   buildOverlaysForCity();
   alert('Zapisano ' + rows.length + ' ' + (rows.length===1?'strefę':'stref') + ' w mieście ' + currentCity + '. Są już w bazie i widoczne na mapie.');
 });
-const EMPTY_CPP_FILTER = { name:'', address:'', capacity:'', cost:'', status:'', skycash:'' };
+const EMPTY_CPP_FILTER = { name:'', vehicleType:'', address:'', capacity:'', cost:'', status:'', skycash:'' };
 let cppFilter = {...EMPTY_CPP_FILTER};
+let cppVehicleTypeSort = null; // null | 'asc' | 'desc'
 function filteredCityParkings(rows){
-  return rows.filter(p=>{
+  let out = rows.filter(p=>{
     if(cppFilter.name && !(p.name||'').toLowerCase().includes(cppFilter.name.toLowerCase())) return false;
+    if(cppFilter.vehicleType && (p.vehicleType||'osobowe')!==cppFilter.vehicleType) return false;
     if(cppFilter.address && !(p.address||'').toLowerCase().includes(cppFilter.address.toLowerCase())) return false;
     if(cppFilter.capacity && !String(p.capacity||0).includes(cppFilter.capacity)) return false;
     if(cppFilter.cost && !String(p.cost||0).includes(cppFilter.cost)) return false;
@@ -2009,6 +2050,14 @@ function filteredCityParkings(rows){
     if(cppFilter.skycash && (p.skycash||'wlaczony')!==cppFilter.skycash) return false;
     return true;
   });
+  if(cppVehicleTypeSort){
+    const order = {osobowe:0, dostawcze:1};
+    out = [...out].sort((a,b)=>{
+      const av = order[a.vehicleType||'osobowe']||0, bv = order[b.vehicleType||'osobowe']||0;
+      return cppVehicleTypeSort==='asc' ? av-bv : bv-av;
+    });
+  }
+  return out;
 }
 function renderCityParkingsPanel(){
   const nameEl = document.getElementById('cpp-city-name');
@@ -2023,14 +2072,15 @@ function renderCityParkingsPanel(){
     wrap.innerHTML = `
       <table class="tbl-fixed">
         <colgroup>
-          <col style="width:240px"><col style="width:190px"><col style="width:60px">
+          <col style="width:220px"><col style="width:100px"><col style="width:190px"><col style="width:60px">
           <col style="width:80px"><col style="width:85px"><col style="width:75px"><col style="width:110px">
         </colgroup>
         <tr>
-          <th>Nazwa parkingu</th><th>Adres</th><th>Miejsca</th><th>Koszt/mc</th><th>Status</th><th>SkyCash</th><th>Akcje</th>
+          <th>Nazwa parkingu</th><th id="th-cpp-vehicle-type" class="sort-th" title="Kliknij, żeby sortować">Rodzaj${cppVehicleTypeSort? (cppVehicleTypeSort==='asc'?' ▲':' ▼') : ''}</th><th>Adres</th><th>Miejsca</th><th>Koszt/mc</th><th>Status</th><th>SkyCash</th><th>Akcje</th>
         </tr>
         <tr class="filter-row">
           <th><input id="cf-name" placeholder="Szukaj..." value="${esc(cppFilter.name)}"></th>
+          <th><select id="cf-vehicleType"><option value="">Wszystkie</option>${Object.entries(VEHICLE_TYPE_LABEL).map(([k,v])=>`<option value="${k}" ${cppFilter.vehicleType===k?'selected':''}>${v}</option>`).join('')}</select></th>
           <th><input id="cf-address" placeholder="Szukaj..." value="${esc(cppFilter.address)}"></th>
           <th><input id="cf-capacity" placeholder="Szukaj..." value="${esc(cppFilter.capacity)}"></th>
           <th><input id="cf-cost" placeholder="Szukaj..." value="${esc(cppFilter.cost)}"></th>
@@ -2043,11 +2093,16 @@ function renderCityParkingsPanel(){
     const bindText = (id,key) => document.getElementById(id).addEventListener('input', e=>{ cppFilter[key]=e.target.value; renderCityParkingsBody(); });
     const bindSelect = (id,key) => document.getElementById(id).addEventListener('change', e=>{ cppFilter[key]=e.target.value; renderCityParkingsBody(); });
     bindText('cf-name','name');
+    bindSelect('cf-vehicleType','vehicleType');
     bindText('cf-address','address');
     bindText('cf-capacity','capacity');
     bindText('cf-cost','cost');
     bindSelect('cf-status','status');
     bindSelect('cf-skycash','skycash');
+    document.getElementById('th-cpp-vehicle-type').addEventListener('click', ()=>{
+      cppVehicleTypeSort = cppVehicleTypeSort==='asc' ? 'desc' : (cppVehicleTypeSort==='desc' ? null : 'asc');
+      renderCityParkingsPanel();
+    });
     renderCityParkingsBody();
   }
   const active = rows.filter(p=>p.status==='aktywny');
@@ -2063,14 +2118,16 @@ function renderCityParkingsBody(){
   const tbody = document.getElementById('cpp-body');
   if(!tbody) return;
   const rows = filteredCityParkings(state.parkings.filter(p=>p.city===currentCity));
-  if(!rows.length){ tbody.innerHTML = `<tr><td colspan="7"><div class="empty">Brak parkingów spełniających filtry.</div></td></tr>`; return; }
+  if(!rows.length){ tbody.innerHTML = `<tr><td colspan="8"><div class="empty">Brak parkingów spełniających filtry.</div></td></tr>`; return; }
   tbody.innerHTML = rows.map(p=>{
     const skyOn = (p.skycash||'wlaczony')==='wlaczony';
+    const vType = p.vehicleType||'osobowe';
     const completeIcon = p.complete
       ? `<span class="complete-flag" title="Parking kompletny" style="color:var(--succ);">✅</span>`
       : `<span class="complete-flag" title="Wymagana akcja" style="color:#c9860a;">⚠️</span>`;
     return `<tr data-id="${p.id}" title="Kliknij, żeby pokazać ten parking na mapie" style="cursor:pointer;">
       <td class="cell-wrap">${esc(p.name)}</td>
+      <td><span class="pill ${vType}">${VEHICLE_TYPE_LABEL[vType]}</span></td>
       <td class="cell-wrap" style="color:var(--ts);">${esc(p.address||'')}</td>
       <td>${p.capacity||0}</td>
       <td>${Number(p.cost||0).toLocaleString('pl-PL')} zł</td>
@@ -2091,8 +2148,15 @@ function renderCityParkingsBody(){
   tbody.querySelectorAll('.cpp-del-btn').forEach(b=>b.addEventListener('click', ()=>deleteParking(b.dataset.id)));
 }
 const PARKING_PIN_COLOR = '#03938a';
+const DELIVERY_PIN_COLOR = '#1e3a5f';
 const PARKING_PIN_BASE_W = 46, PARKING_PIN_BASE_H = 40;
 const PARKING_PIN_ICONS = {};
+const DELIVERY_VAN_MARK = `<g transform="translate(16,20) scale(1.15)" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="1" y="3" width="15" height="13"></rect>
+          <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+          <circle cx="5.5" cy="18.5" r="2.5"></circle>
+          <circle cx="18.5" cy="18.5" r="2.5"></circle>
+        </g>`;
 function pinScaleForZoom(zoom){
   if(zoom>=16) return 1;
   if(zoom>=14) return 0.8;
@@ -2100,17 +2164,22 @@ function pinScaleForZoom(zoom){
   if(zoom>=10) return 0.45;
   return 0.35;
 }
-function parkingPinIcon(capacity, scale){
+function parkingPinIcon(capacity, scale, vehicleType){
   scale = scale || 1;
+  vehicleType = vehicleType==='dostawcze' ? 'dostawcze' : 'osobowe';
   const key = (capacity===null || capacity===undefined || capacity==='') ? '' : String(capacity);
-  const cacheKey = key + '|' + scale;
+  const cacheKey = vehicleType + '|' + key + '|' + scale;
   if(!PARKING_PIN_ICONS[cacheKey]){
     const w = Math.round(PARKING_PIN_BASE_W*scale), h = Math.round(PARKING_PIN_BASE_H*scale);
+    const color = vehicleType==='dostawcze' ? DELIVERY_PIN_COLOR : PARKING_PIN_COLOR;
+    const iconMark = vehicleType==='dostawcze'
+      ? DELIVERY_VAN_MARK
+      : `<text x="30" y="46" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="36" fill="#fff" text-anchor="middle">P</text>`;
     PARKING_PIN_ICONS[cacheKey] = L.divIcon({
       className: 'parking-pin-wrap',
       html: `<svg viewBox="0 0 120 100" width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
-        <path d="M16,2 H104 A14,14 0 0 1 118,16 V50 A14,14 0 0 1 104,64 L81,64 L60,97 L39,64 L16,64 A14,14 0 0 1 2,50 V16 A14,14 0 0 1 16,2 Z" fill="${PARKING_PIN_COLOR}" stroke="#fff" stroke-width="6" stroke-linejoin="round"/>
-        <text x="30" y="46" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="36" fill="#fff" text-anchor="middle">P</text>
+        <path d="M16,2 H104 A14,14 0 0 1 118,16 V50 A14,14 0 0 1 104,64 L81,64 L60,97 L39,64 L16,64 A14,14 0 0 1 2,50 V16 A14,14 0 0 1 16,2 Z" fill="${color}" stroke="#fff" stroke-width="6" stroke-linejoin="round"/>
+        ${iconMark}
         <text x="84" y="46" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="34" fill="#fff" text-anchor="middle">${esc(key)}</text>
       </svg>`,
       iconSize: [w, h],
@@ -2142,7 +2211,7 @@ function plotParkingMarkers(){
   state.parkings.filter(p=>p.city===currentCity && p.lat!=null && p.lng!=null).forEach(p=>{
     let m;
     if(p.status === 'aktywny'){
-      m = L.marker([p.lat,p.lng], {icon: parkingPinIcon(p.capacity, pinScale)}).addTo(map);
+      m = L.marker([p.lat,p.lng], {icon: parkingPinIcon(p.capacity, pinScale, p.vehicleType)}).addTo(map);
     } else {
       const color = STATUS_COLOR[p.status] || '#6b6a64';
       m = L.marker([p.lat,p.lng], {icon: statusPinIcon(color)}).addTo(map);
@@ -2166,7 +2235,8 @@ function renderLegend(){
   const el = document.getElementById('m-legend');
   if(!el) return;
   el.innerHTML = `
-    <span><svg width="20" height="17" viewBox="0 0 120 100" style="vertical-align:-4px;margin-right:5px;"><path d="M16,2 H104 A14,14 0 0 1 118,16 V50 A14,14 0 0 1 104,64 L81,64 L60,97 L39,64 L16,64 A14,14 0 0 1 2,50 V16 A14,14 0 0 1 16,2 Z" fill="${PARKING_PIN_COLOR}" stroke="#fff" stroke-width="6" stroke-linejoin="round"/><text x="60" y="46" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="34" fill="#fff" text-anchor="middle">P</text></svg>Aktywny (liczba = miejsca)</span>
+    <span><svg width="20" height="17" viewBox="0 0 120 100" style="vertical-align:-4px;margin-right:5px;"><path d="M16,2 H104 A14,14 0 0 1 118,16 V50 A14,14 0 0 1 104,64 L81,64 L60,97 L39,64 L16,64 A14,14 0 0 1 2,50 V16 A14,14 0 0 1 16,2 Z" fill="${PARKING_PIN_COLOR}" stroke="#fff" stroke-width="6" stroke-linejoin="round"/><text x="60" y="46" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="34" fill="#fff" text-anchor="middle">P</text></svg>Aktywny osobowy (liczba = miejsca)</span>
+    <span><svg width="20" height="17" viewBox="0 0 120 100" style="vertical-align:-4px;margin-right:5px;"><path d="M16,2 H104 A14,14 0 0 1 118,16 V50 A14,14 0 0 1 104,64 L81,64 L60,97 L39,64 L16,64 A14,14 0 0 1 2,50 V16 A14,14 0 0 1 16,2 Z" fill="${DELIVERY_PIN_COLOR}" stroke="#fff" stroke-width="6" stroke-linejoin="round"/><g transform="translate(46,20) scale(1.15)" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></g></svg>Aktywny dostawczy</span>
     <span><span class="status-pin" style="width:16px;height:16px;font-size:9px;border-width:1px;vertical-align:-3px;margin-right:5px;display:inline-flex;background:#854f0b;">P</span>W rozmowach</span>
     <span><span class="status-pin" style="width:16px;height:16px;font-size:9px;border-width:1px;vertical-align:-3px;margin-right:5px;display:inline-flex;background:#6b6a64;">P</span>Typowany</span>
     <span><span class="status-pin" style="width:16px;height:16px;font-size:9px;border-width:1px;vertical-align:-3px;margin-right:5px;display:inline-flex;background:#a32d2d;">P</span>Odrzucony</span>
