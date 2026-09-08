@@ -291,6 +291,15 @@ body.map-maximized-active{overflow:hidden;}
   </div>
 </div>
 
+<div class="overlay" id="photo-lightbox">
+  <div style="max-width:92vw;max-height:90vh;display:flex;flex-direction:column;align-items:center;gap:12px;">
+    <img id="photo-lightbox-img" src="" style="max-width:92vw;max-height:78vh;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,0.5);">
+    <div style="display:flex;gap:8px;">
+      <a id="photo-lightbox-download" style="text-decoration:none;display:inline-flex;align-items:center;padding:7px 12px;border-radius:6px;background:var(--acc);border:1px solid var(--acc);color:#fff;font-size:13px;">⬇️ Pobierz</a>
+      <button id="photo-lightbox-close">Zamknij</button>
+    </div>
+  </div>
+</div>
 
 <div class="overlay" id="kml-import-overlay">
   <div class="modal" style="width:520px;">
@@ -954,6 +963,35 @@ function renderDetailsQuickFacts(p){
   ];
   return rows.map(([label,val])=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px solid var(--bd);"><span style="color:var(--ts);">${label}</span><span>${val}</span></div>`).join('');
 }
+function safeFileName(s){
+  return (s||'zdjecie').toString().replace(/[\\/:*?"<>|]+/g,'_').trim() || 'zdjecie';
+}
+function extensionFromDataUrl(src){
+  const m = /^data:image\/(\w+);/.exec(src||'');
+  return m ? (m[1]==='jpeg'?'jpg':m[1]) : 'jpg';
+}
+function setPhotoPreview(container, src, downloadName){
+  container.innerHTML = src
+    ? `<img src="${src}" style="width:100%;height:100%;object-fit:cover;cursor:pointer;" title="Kliknij, żeby powiększyć">`
+    : `<span style="color:var(--tm);font-size:11px;">Brak zdjęcia</span>`;
+  container.style.cursor = src ? 'pointer' : 'default';
+  container.onclick = src ? ()=>openPhotoLightbox(src, downloadName) : null;
+}
+function openPhotoLightbox(src, downloadName){
+  document.getElementById('photo-lightbox-img').src = src;
+  const dl = document.getElementById('photo-lightbox-download');
+  dl.href = src;
+  dl.download = downloadName || ('zdjecie.' + extensionFromDataUrl(src));
+  document.getElementById('photo-lightbox').classList.add('show');
+}
+function closePhotoLightbox(){
+  document.getElementById('photo-lightbox').classList.remove('show');
+}
+document.getElementById('photo-lightbox-close').addEventListener('click', closePhotoLightbox);
+document.getElementById('photo-lightbox').addEventListener('click', (e)=>{
+  if(e.target.id === 'photo-lightbox') closePhotoLightbox();
+});
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closePhotoLightbox(); });
 function openDetailsModal(id){
   const p = state.parkings.find(x=>x.id===id);
   if(!p) return;
@@ -969,7 +1007,7 @@ function openDetailsModal(id){
   renderCompleteBtn(document.getElementById('dt-complete-btn'), !!p.complete);
   document.getElementById('dt-quick-facts').innerHTML = renderDetailsQuickFacts(p);
   const preview = document.getElementById('dt-photo-preview');
-  preview.innerHTML = p.photo ? `<img src="${p.photo}" style="width:100%;height:100%;object-fit:cover;">` : `<span style="color:var(--tm);font-size:11px;">Brak zdjęcia</span>`;
+  setPhotoPreview(preview, p.photo, p.photo ? (safeFileName(p.name) + '.' + extensionFromDataUrl(p.photo)) : null);
   delete preview.dataset.newPhoto;
   document.getElementById('dt-photo-input').value = '';
   document.getElementById('details-overlay').classList.add('show');
@@ -980,7 +1018,8 @@ document.getElementById('dt-photo-input').addEventListener('change', (e)=>{
   const reader = new FileReader();
   reader.onload = ()=>{
     const preview = document.getElementById('dt-photo-preview');
-    preview.innerHTML = `<img src="${reader.result}" style="width:100%;height:100%;object-fit:cover;">`;
+    const p = state.parkings.find(x=>x.id===document.getElementById('dt-id').value);
+    setPhotoPreview(preview, reader.result, safeFileName(p? p.name : '') + '.' + extensionFromDataUrl(reader.result));
     preview.dataset.newPhoto = reader.result;
   };
   reader.readAsDataURL(file);
