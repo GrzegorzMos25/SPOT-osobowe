@@ -282,7 +282,11 @@ body.map-maximized-active{overflow:hidden;}
       <textarea id="dt-required-action" rows="2" placeholder="np. brakuje skanu umowy, czekamy na pilota do szlabanu..."></textarea>
     </div>
     <div class="modal-actions" style="justify-content:space-between;">
-      <button id="dt-edit">✏️ Edytuj</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button id="dt-edit">✏️ Edytuj</button>
+        <button id="dt-move">📍 Przesuń na mapie</button>
+        <button id="dt-delete" class="danger">🗑️ Usuń</button>
+      </div>
       <div style="display:flex;gap:8px;">
         <button id="dt-cancel">Anuluj</button>
         <button class="primary" id="dt-save">Zapisz</button>
@@ -1032,6 +1036,16 @@ document.getElementById('dt-edit').addEventListener('click', ()=>{
   document.getElementById('details-overlay').classList.remove('show');
   openParkingModal(id);
 });
+document.getElementById('dt-move').addEventListener('click', ()=>{
+  const id = document.getElementById('dt-id').value;
+  document.getElementById('details-overlay').classList.remove('show');
+  startMoveParking(id);
+});
+document.getElementById('dt-delete').addEventListener('click', ()=>{
+  const id = document.getElementById('dt-id').value;
+  document.getElementById('details-overlay').classList.remove('show');
+  deleteParking(id);
+});
 document.getElementById('dt-save').addEventListener('click', async ()=>{
   const id = document.getElementById('dt-id').value;
   const p = state.parkings.find(x=>x.id===id);
@@ -1491,6 +1505,12 @@ function buildMap(){
   setMapStyle(currentMapStyle);
 
   map.on('click', function(e){
+    if(moveParkingId){
+      movePendingLatLng = e.latlng;
+      const mm = markersById[moveParkingId];
+      if(mm) mm.setLatLng(e.latlng);
+      return;
+    }
     if(measureMode){ addMeasurePoint(e.latlng); return; }
     if(polyMode==='draw'){ addPolyVertex(e.latlng); return; }
     if(polyMode==='edit') return;
@@ -1498,7 +1518,7 @@ function buildMap(){
     openParkingModal(null, {city: currentCity, lat: Number(e.latlng.lat.toFixed(5)), lng: Number(e.latlng.lng.toFixed(5))});
   });
   map.on('contextmenu', function(e){
-    if(polyMode || exportSelectMode || measureMode) return;
+    if(polyMode || exportSelectMode || measureMode || moveParkingId) return;
     showMapContextMenu(e.originalEvent.clientX, e.originalEvent.clientY, e.latlng);
   });
   map.on('zoomend', plotParkingMarkers);
@@ -1531,7 +1551,52 @@ function escCloseFullscreen(e){
 function cancelAnyMapAction(){
   if(polyMode) cancelPoly();
   if(measureMode) stopMeasure();
+  if(moveParkingId) cancelMoveParking();
   closeMapContextMenu();
+}
+
+/* --- moving a parking pin: drag it or click the new spot, then save --- */
+let moveParkingId = null;
+let movePendingLatLng = null;
+function startMoveParking(id){
+  const p = state.parkings.find(x=>x.id===id);
+  if(!p) return;
+  if(p.lat==null || p.lng==null){ alert('Ten parking nie ma ustawionych współrzędnych na mapie.'); return; }
+  if(!document.getElementById('view-map').classList.contains('active')){
+    document.querySelector('.tab-btn[data-view="map"]').click();
+  }
+  if(p.city !== currentCity){
+    const cityBtn = document.querySelector(`.city-tile-btn[data-city="${p.city}"]`);
+    if(cityBtn) cityBtn.click();
+  }
+  cancelAnyMapAction();
+  moveParkingId = id;
+  movePendingLatLng = L.latLng(p.lat, p.lng);
+  plotParkingMarkers();
+  map.setView(movePendingLatLng, Math.max(map.getZoom(), 16));
+  renderMapControls();
+}
+function cancelMoveParking(){
+  moveParkingId = null;
+  movePendingLatLng = null;
+  if(map) plotParkingMarkers();
+  renderMapControls();
+}
+async function saveMoveParking(){
+  const p = state.parkings.find(x=>x.id===moveParkingId);
+  if(!p || !movePendingLatLng){ cancelMoveParking(); return; }
+  const oldLat = p.lat, oldLng = p.lng;
+  p.lat = Number(movePendingLatLng.lat.toFixed(6));
+  p.lng = Number(movePendingLatLng.lng.toFixed(6));
+  const { error } = await supabaseClient.from('parkings').upsert(parkingToRow(p));
+  if(error){
+    p.lat = oldLat; p.lng = oldLng;
+    dbError('zapisywanie nowego położenia parkingu', error);
+    return;
+  }
+  flashSaved();
+  cancelMoveParking();
+  renderCityParkingsPanel();
 }
 
 /* --- controls panel: switches between default / drawing / editing --- */
@@ -1564,6 +1629,16 @@ function renderMapControls(){
     `;
     hint.textContent = 'Klikaj lewym przyciskiem na mapie, żeby dodawać kolejne punkty pomiaru odległości.';
     document.getElementById('m-measure-finish').addEventListener('click', stopMeasure);
+  } else if(moveParkingId){
+    const mp = state.parkings.find(x=>x.id===moveParkingId);
+    wrap.innerHTML = `
+      <span class="hint">Przesuwasz: <b>${esc(mp? mp.name : '')}</b></span>
+      <button id="m-move-save" class="primary">Zapisz nowe położenie</button>
+      <button id="m-move-cancel">Anuluj</button>
+    `;
+    hint.textContent = 'Złap pinezkę i przeciągnij ją w nowe miejsce albo kliknij na mapie tam, gdzie ma stać. Potem kliknij "Zapisz nowe położenie".';
+    document.getElementById('m-move-save').addEventListener('click', saveMoveParking);
+    document.getElementById('m-move-cancel').addEventListener('click', cancelMoveParking);
   } else if(exportSelectMode){
     wrap.innerHTML = `
       <span class="hint">Zaznaczono: ${exportSelectedIds.size}</span>
@@ -2284,9 +2359,16 @@ function plotParkingMarkers(){
       const color = STATUS_COLOR[p.status] || '#6b6a64';
       m = L.marker([p.lat,p.lng], {icon: statusPinIcon(color, isOrlen(p))}).addTo(map);
     }
+    if(p.id === moveParkingId){
+      if(movePendingLatLng) m.setLatLng(movePendingLatLng);
+      m.dragging.enable();
+      m.setZIndexOffset(1000);
+      m.on('dragend', ()=>{ movePendingLatLng = m.getLatLng(); });
+    }
     m.on('click', e=> {
       if(polyMode || measureMode) return;
       L.DomEvent.stopPropagation(e);
+      if(moveParkingId) return;
       openDetailsModal(p.id);
     });
     markersOnMap.push(m);
