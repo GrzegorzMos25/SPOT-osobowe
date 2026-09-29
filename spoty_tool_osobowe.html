@@ -73,6 +73,18 @@ button.danger{color:var(--dang);}
 .pill.skycash-off{background:var(--bgsucc);color:var(--succ);}
 .pill.osobowe{background:var(--bgacc);color:var(--acc);}
 .pill.dostawcze{background:#dde4f2;color:#1e3a5f;}
+.pill.act-do_zrobienia{background:var(--bd);color:var(--ts);}
+.pill.act-czeka{background:var(--bgwarn);color:var(--warn);}
+.pill.act-odpowiedz{background:var(--bgacc);color:var(--acc);}
+.pill.act-zakonczone{background:var(--bgsucc);color:var(--succ);}
+.pill.overdue{background:var(--bgdang);color:var(--dang);}
+.act-history{border:1px solid var(--bd);border-radius:8px;max-height:220px;overflow-y:auto;background:var(--s0);}
+.act-history-item{padding:8px 10px;border-bottom:1px solid var(--bd);font-size:13px;}
+.act-history-item:last-child{border-bottom:none;}
+.act-history-item .when{font-size:11px;color:var(--tm);display:block;margin-bottom:2px;}
+.act-history-item .txt{white-space:pre-wrap;}
+.metric.clickable{cursor:pointer;}
+.metric.clickable:hover{border-color:var(--bds);}
 .sort-th{cursor:pointer;user-select:none;}
 .sort-th:hover{color:var(--tp);}
 .toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;justify-content:space-between;}
@@ -143,6 +155,7 @@ body.map-maximized-active{overflow:hidden;}
     <button class="tab-btn" data-view="table">Baza parkingów</button>
     <button class="tab-btn" data-view="charts">Wykresy postępu</button>
     <button class="tab-btn" data-view="calendar">Kalendarz</button>
+    <button class="tab-btn" data-view="activities">Działania</button>
     <button class="tab-btn" data-view="notes">Notatki</button>
     <button class="tab-btn" data-view="settings">Ustawienia</button>
   </div>
@@ -152,6 +165,7 @@ body.map-maximized-active{overflow:hidden;}
   <div id="view-table" class="view"></div>
   <div id="view-charts" class="view"></div>
   <div id="view-calendar" class="view"></div>
+  <div id="view-activities" class="view"></div>
   <div id="view-notes" class="view"></div>
   <div id="view-settings" class="view"></div>
 </div>
@@ -391,6 +405,78 @@ body.map-maximized-active{overflow:hidden;}
   </div>
 </div>
 
+<div class="overlay" id="activity-overlay">
+  <div class="modal" style="width:640px;">
+    <h3 id="activity-modal-title">Nowe działanie</h3>
+    <input type="hidden" id="ac-id">
+    <div class="field">
+      <label>Co robię (tytuł)</label>
+      <input id="ac-title" placeholder="np. Zapytanie o najem miejsc przy dworcach">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Do kogo (firma / osoba)</label>
+        <input id="ac-partner" placeholder="np. PKP Mobility">
+      </div>
+      <div class="field">
+        <label>Kontakt (e-mail, telefon)</label>
+        <input id="ac-contact" placeholder="np. biuro@firma.pl, 600 000 000">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Miasto</label>
+        <select id="ac-city"></select>
+      </div>
+      <div class="field">
+        <label>Forma kontaktu</label>
+        <select id="ac-channel"></select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Status</label>
+        <select id="ac-status"></select>
+      </div>
+      <div class="field-row" style="gap:8px;">
+        <div class="field">
+          <label>Data działania</label>
+          <input id="ac-date" type="date">
+        </div>
+        <div class="field">
+          <label>Przypomnij mi</label>
+          <input id="ac-follow-up" type="date">
+        </div>
+      </div>
+    </div>
+    <div class="field">
+      <label>Treść wysłanej wiadomości / ustalenia</label>
+      <textarea id="ac-content" rows="6" placeholder="Wklej tu wysłanego maila albo opisz rozmowę"></textarea>
+    </div>
+    <div class="field">
+      <label>Historia</label>
+      <div class="act-history" id="ac-history"></div>
+    </div>
+    <div class="field">
+      <label>Dodaj wpis do historii (np. treść odpowiedzi, notatka z rozmowy)</label>
+      <textarea id="ac-new-entry" rows="2" placeholder="np. Odpisali, że przesyłają ofertę do końca tygodnia"></textarea>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">
+        <button id="ac-mark-sent">✉️ Wysłałem – czekam na odpowiedź</button>
+        <button id="ac-mark-reply">📩 Przyszła odpowiedź</button>
+        <button id="ac-mark-done">✅ Zakończone</button>
+      </div>
+      <p class="hint" style="margin:6px 0 0;">Przyciski zmieniają status i dopisują do historii wpis z dzisiejszą datą (razem z tekstem z pola powyżej, jeśli coś wpisałeś). Zmiany zapisują się po kliknięciu „Zapisz”.</p>
+    </div>
+    <div class="modal-actions" style="justify-content:space-between;">
+      <button id="ac-delete" class="danger">🗑️ Usuń</button>
+      <div style="display:flex;gap:8px;">
+        <button id="ac-cancel">Anuluj</button>
+        <button class="primary" id="ac-save">Zapisz</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="note-overlay">
   <div class="modal" style="width:520px;">
     <h3 id="note-modal-title">Nowa notatka</h3>
@@ -438,7 +524,7 @@ const STATUS_COLOR = {aktywny:'#3b6d11', rozmowy:'#854f0b', typowany:'#6b6a64', 
 const STATUS_LABEL = {aktywny:'Aktywny', rozmowy:'W rozmowach', typowany:'Typowany', odrzucony:'Odrzucony'};
 const VEHICLE_TYPE_LABEL = {osobowe:'Osobowe', dostawcze:'Dostawcze'};
 
-let state = { parkings: [], targets: {...DEFAULT_TARGETS}, zones: {}, tasks: [], notes: [], files: [] };
+let state = { parkings: [], targets: {...DEFAULT_TARGETS}, zones: {}, tasks: [], notes: [], files: [], activities: [] };
 const LAST_CITY_KEY = 'spoty_osobowe_last_city';
 function getInitialCity(){
   try{
@@ -534,6 +620,16 @@ function rowToParking(r){
 function rowToZone(r){ return {id:r.id, type:r.type, latlngs:r.latlngs}; }
 function rowToNote(r){ return {id:r.id, title:r.title||'', content:r.content||'', createdAt:r.created_at||''}; }
 function rowToFile(r){ return {id:r.id, name:r.name||'', size:r.size||0, contentType:r.content_type||'', storagePath:r.storage_path, createdAt:r.created_at||''}; }
+function rowToActivity(r){
+  return {id:r.id, title:r.title||'', partner:r.partner||'', contact:r.contact||'', city:r.city||'', channel:r.channel||'email',
+    status:r.status||'do_zrobienia', date:r.date||'', followUp:r.follow_up||'', content:r.content||'',
+    history:Array.isArray(r.history)? r.history : [], createdAt:r.created_at||'', updatedAt:r.updated_at||''};
+}
+function activityToRow(a){
+  return {id:a.id, title:a.title, partner:a.partner, contact:a.contact, city:a.city, channel:a.channel,
+    status:a.status, date:a.date||null, follow_up:a.followUp||null, content:a.content, history:a.history,
+    created_at:a.createdAt||new Date().toISOString(), updated_at:new Date().toISOString()};
+}
 async function fetchWithRetry(queryFn, retries, delayMs){
   retries = retries===undefined ? 2 : retries;
   delayMs = delayMs===undefined ? 500 : delayMs;
@@ -569,6 +665,9 @@ async function loadAll(){
     fetchAllRows('notes'),
     fetchAllRows('files')
   ]);
+  const activitiesRes = await fetchAllRows('activities');
+  if(activitiesRes.error) dbError('wczytywanie działań', activitiesRes.error);
+  state.activities = (activitiesRes.data||[]).map(rowToActivity);
   if(parkingsRes.error) dbError('wczytywanie parkingów', parkingsRes.error);
   if(targetsRes.error) dbError('wczytywanie celów', targetsRes.error);
   if(zonesRes.error) dbError('wczytywanie stref', zonesRes.error);
@@ -612,10 +711,17 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     if(v==='dashboard') renderDashboard();
     if(v==='table') renderTable();
     if(v==='calendar') renderCalendar();
+    if(v==='activities') renderActivities();
     if(v==='notes') renderNotes();
     if(v==='settings') renderSettings();
+    try{ history.replaceState(null, '', '#' + v); }catch(e){}
   });
 });
+function openTabFromHash(){
+  const v = (location.hash||'').replace('#','');
+  const btn = v && document.querySelector(`.tab-btn[data-view="${v}"]`);
+  if(btn) btn.click();
+}
 
 /* ---------- DASHBOARD ---------- */
 function renderDashboard(){
@@ -640,6 +746,8 @@ function renderDashboard(){
     ? `<span style="font-size:15px;font-weight:500;display:block;">${esc(nextTask.title)}</span><span style="font-size:12px;color:var(--ts);">${formatTaskDate(nextTask.date)}</span>`
     : `<span style="font-size:14px;color:var(--tm);">Brak zaplanowanych zadań</span>`;
   const upcomingTasks = state.tasks.filter(t=>!t.done && t.date>=todayStr).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,5);
+  const waitingActs = state.activities.filter(a=>a.status==='czeka');
+  const overdueActs = state.activities.filter(activityIsOverdue);
 
   el.innerHTML = `
     <div class="grid4">
@@ -648,6 +756,11 @@ function renderDashboard(){
       <div class="metric"><p class="l">Brakuje do celu</p><p class="v" style="color:${missing>0?'var(--dang)':'var(--succ)'}">${missing>0?'-'+missing:0}</p></div>
       <div class="metric"><p class="l">Koszt miesięczny (aktywne)</p><p class="v">${cost.toLocaleString('pl-PL')} zł</p></div>
       <div class="metric"><p class="l">Zadania</p>${taskTileContent}</div>
+      <div class="metric clickable" id="dash-activities-tile" title="Przejdź do zakładki Działania">
+        <p class="l">Czekam na odpowiedź</p>
+        <p class="v" style="color:${waitingActs.length?'var(--warn)':'inherit'}">${waitingActs.length}</p>
+        ${overdueActs.length? `<span style="font-size:12px;color:var(--dang);">${overdueActs.length} do przypomnienia</span>` : ''}
+      </div>
     </div>
     <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:16px;">
       <div>
@@ -698,6 +811,10 @@ function renderDashboard(){
     </div>
   `;
   document.getElementById('dl-progress-img').addEventListener('click', downloadProgressImage);
+  document.getElementById('dash-activities-tile').addEventListener('click', ()=>{
+    activityFilter.status = overdueActs.length ? 'przypomnienie' : 'czeka';
+    document.querySelector('.tab-btn[data-view="activities"]').click();
+  });
 }
 async function downloadProgressImage(){
   const node = document.getElementById('progress-by-city-card');
@@ -2767,6 +2884,239 @@ async function deleteNote(id){
   if(document.getElementById('view-notes').classList.contains('active')) renderNotesBody();
 }
 
+/* ---------- ACTIVITIES (dziennik działań) ---------- */
+const ACTIVITY_STATUS_LABEL = {
+  do_zrobienia: 'Do zrobienia',
+  czeka: 'Wysłane – czekam na odpowiedź',
+  odpowiedz: 'Jest odpowiedź',
+  zakonczone: 'Zakończone'
+};
+const ACTIVITY_CHANNEL_LABEL = {email:'E-mail', telefon:'Telefon', spotkanie:'Spotkanie', inne:'Inne'};
+const ACTIVITY_CITY_OTHER = 'Kilka miast / ogólne';
+let activityFilter = {status:'otwarte', city:'', q:''};
+let activityDraft = null; // copy of the activity being edited in the modal
+
+function activityIsOpen(a){ return a.status!=='zakonczone'; }
+function activityIsOverdue(a){ return activityIsOpen(a) && a.followUp && a.followUp <= toDateStr(new Date()); }
+function daysSince(dateStr){
+  if(!dateStr) return null;
+  const d = new Date(dateStr.slice(0,10)+'T00:00:00');
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.round((today-d)/(1000*3600*24));
+}
+function formatActivityDate(dateStr){
+  if(!dateStr) return '—';
+  return new Date(dateStr.slice(0,10)+'T00:00:00').toLocaleDateString('pl-PL', {day:'numeric', month:'short', year:'numeric'});
+}
+function formatHistoryWhen(iso){
+  const d = new Date(iso);
+  return isNaN(d) ? '' : d.toLocaleString('pl-PL', {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'});
+}
+function lastHistoryText(a){
+  const h = a.history[a.history.length-1];
+  return h ? h.text : '';
+}
+function sortedActivities(){
+  return [...state.activities].sort((a,b)=>{
+    // overdue first, then open, then by date desc
+    const o = (activityIsOverdue(b)?1:0) - (activityIsOverdue(a)?1:0);
+    if(o) return o;
+    const op = (activityIsOpen(b)?1:0) - (activityIsOpen(a)?1:0);
+    if(op) return op;
+    return (b.date||b.createdAt||'').localeCompare(a.date||a.createdAt||'');
+  });
+}
+function renderActivities(){
+  const el = document.getElementById('view-activities');
+  const open = state.activities.filter(activityIsOpen);
+  const waiting = state.activities.filter(a=>a.status==='czeka');
+  const overdue = state.activities.filter(activityIsOverdue);
+  const cityOptions = ['', ...Object.keys(CITIES), ACTIVITY_CITY_OTHER];
+  el.innerHTML = `
+    <div class="grid4">
+      <div class="metric clickable" data-f="czeka"><p class="l">Czekam na odpowiedź</p><p class="v" style="color:${waiting.length?'var(--warn)':'inherit'}">${waiting.length}</p></div>
+      <div class="metric clickable" data-f="przypomnienie"><p class="l">Do przypomnienia (termin minął)</p><p class="v" style="color:${overdue.length?'var(--dang)':'inherit'}">${overdue.length}</p></div>
+      <div class="metric clickable" data-f="otwarte"><p class="l">Otwarte działania</p><p class="v">${open.length}</p></div>
+      <div class="metric clickable" data-f=""><p class="l">Wszystkie (historia)</p><p class="v">${state.activities.length}</p></div>
+    </div>
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <select id="acf-status">
+          <option value="otwarte">Otwarte</option>
+          <option value="przypomnienie">Termin przypomnienia minął</option>
+          ${Object.entries(ACTIVITY_STATUS_LABEL).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}
+          <option value="">Wszystkie</option>
+        </select>
+        <select id="acf-city">${cityOptions.map(c=>`<option value="${esc(c)}">${c? esc(c) : 'Wszystkie miasta'}</option>`).join('')}</select>
+        <input id="acf-q" placeholder="Szukaj (firma, tytuł, treść)..." style="width:230px;">
+      </div>
+      <div class="toolbar-left">
+        <button class="primary" id="ac-add">+ Nowe działanie</button>
+      </div>
+    </div>
+    <div class="card" style="padding:0;overflow-x:auto;">
+      <table class="tbl-fixed">
+        <colgroup>
+          <col style="width:110px"><col><col style="width:130px"><col style="width:190px"><col style="width:120px"><col style="width:220px"><col style="width:100px">
+        </colgroup>
+        <tr><th>Data</th><th>Działanie</th><th>Miasto</th><th>Status</th><th>Przypomnij</th><th>Ostatni wpis</th><th>Akcje</th></tr>
+        <tbody id="activities-body"></tbody>
+      </table>
+    </div>
+    <p class="hint" style="margin-top:10px;">Każda zmiana statusu i każdy dopisany wpis trafia do historii działania. Zakończone działania nie znikają – zobaczysz je po wybraniu „Wszystkie”.</p>
+  `;
+  document.getElementById('acf-status').value = activityFilter.status;
+  document.getElementById('acf-city').value = activityFilter.city;
+  document.getElementById('acf-q').value = activityFilter.q;
+  document.getElementById('acf-status').addEventListener('change', e=>{ activityFilter.status = e.target.value; renderActivitiesBody(); });
+  document.getElementById('acf-city').addEventListener('change', e=>{ activityFilter.city = e.target.value; renderActivitiesBody(); });
+  document.getElementById('acf-q').addEventListener('input', e=>{ activityFilter.q = e.target.value; renderActivitiesBody(); });
+  document.getElementById('ac-add').addEventListener('click', ()=>openActivityModal(null));
+  el.querySelectorAll('.metric.clickable').forEach(m=>m.addEventListener('click', ()=>{
+    activityFilter.status = m.dataset.f;
+    document.getElementById('acf-status').value = activityFilter.status;
+    renderActivitiesBody();
+  }));
+  renderActivitiesBody();
+}
+function renderActivitiesBody(){
+  const body = document.getElementById('activities-body');
+  if(!body) return;
+  const q = activityFilter.q.trim().toLowerCase();
+  const rows = sortedActivities().filter(a=>{
+    if(activityFilter.status==='otwarte' && !activityIsOpen(a)) return false;
+    if(activityFilter.status==='przypomnienie' && !activityIsOverdue(a)) return false;
+    if(ACTIVITY_STATUS_LABEL[activityFilter.status] && a.status!==activityFilter.status) return false;
+    if(activityFilter.city && a.city!==activityFilter.city) return false;
+    if(q && ![a.title, a.partner, a.contact, a.content, ...a.history.map(h=>h.text)].join(' ').toLowerCase().includes(q)) return false;
+    return true;
+  });
+  if(!rows.length){ body.innerHTML = `<tr><td colspan="7"><div class="empty">Brak działań dla wybranych filtrów.</div></td></tr>`; return; }
+  body.innerHTML = rows.map(a=>{
+    const waitDays = a.status==='czeka' ? daysSince(a.date) : null;
+    return `<tr data-id="${a.id}" style="cursor:pointer;">
+      <td style="color:var(--ts);">${formatActivityDate(a.date)}</td>
+      <td class="cell-wrap"><b style="font-weight:500;">${esc(a.title||'Bez tytułu')}</b>${a.partner? `<br><span style="color:var(--ts);font-size:12px;">${esc(a.partner)} · ${esc(ACTIVITY_CHANNEL_LABEL[a.channel]||'')}</span>` : ''}</td>
+      <td class="cell-wrap">${esc(a.city||'—')}</td>
+      <td class="cell-wrap"><span class="pill act-${a.status}">${ACTIVITY_STATUS_LABEL[a.status]||a.status}</span>${waitDays!==null && waitDays>0 ? `<br><span class="hint">od ${waitDays} dn.</span>` : ''}</td>
+      <td>${a.followUp ? `<span class="pill ${activityIsOverdue(a)?'overdue':'typowany'}">${formatActivityDate(a.followUp)}</span>` : '<span class="hint">—</span>'}</td>
+      <td class="cell-wrap" style="color:var(--ts);font-size:12px;">${esc(lastHistoryText(a)).slice(0,140)}</td>
+      <td><div class="row-actions"><button data-id="${a.id}" class="ac-open-btn">Otwórz</button></div></td>
+    </tr>`;
+  }).join('');
+  body.querySelectorAll('tr[data-id]').forEach(tr=>tr.addEventListener('click', ()=>openActivityModal(tr.dataset.id)));
+}
+function fillSelect(sel, entries, value){
+  sel.innerHTML = entries.map(([k,v])=>`<option value="${esc(k)}">${esc(v)}</option>`).join('');
+  sel.value = value;
+}
+function openActivityModal(id){
+  const a = id ? state.activities.find(x=>x.id===id) : null;
+  activityDraft = a ? JSON.parse(JSON.stringify(a)) : {
+    id: 'a' + Math.random().toString(36).slice(2,10), title:'', partner:'', contact:'', city:'', channel:'email',
+    status:'do_zrobienia', date: toDateStr(new Date()), followUp:'', content:'', history:[], createdAt:''
+  };
+  const d = activityDraft;
+  document.getElementById('activity-modal-title').textContent = a ? 'Działanie' : 'Nowe działanie';
+  document.getElementById('ac-id').value = a ? a.id : '';
+  document.getElementById('ac-title').value = d.title;
+  document.getElementById('ac-partner').value = d.partner;
+  document.getElementById('ac-contact').value = d.contact;
+  fillSelect(document.getElementById('ac-city'), [['', '—'], ...Object.keys(CITIES).map(c=>[c,c]), [ACTIVITY_CITY_OTHER, ACTIVITY_CITY_OTHER]], d.city);
+  fillSelect(document.getElementById('ac-channel'), Object.entries(ACTIVITY_CHANNEL_LABEL), d.channel);
+  fillSelect(document.getElementById('ac-status'), Object.entries(ACTIVITY_STATUS_LABEL), d.status);
+  document.getElementById('ac-date').value = d.date || '';
+  document.getElementById('ac-follow-up').value = d.followUp || '';
+  document.getElementById('ac-content').value = d.content;
+  document.getElementById('ac-new-entry').value = '';
+  document.getElementById('ac-delete').style.visibility = a ? 'visible' : 'hidden';
+  renderActivityHistory();
+  document.getElementById('activity-overlay').classList.add('show');
+}
+function renderActivityHistory(){
+  const el = document.getElementById('ac-history');
+  const h = activityDraft ? [...activityDraft.history].reverse() : [];
+  el.innerHTML = h.length
+    ? h.map(e=>`<div class="act-history-item"><span class="when">${formatHistoryWhen(e.at)}</span><span class="txt">${esc(e.text)}</span></div>`).join('')
+    : `<div class="act-history-item"><span class="hint">Brak wpisów. Historia uzupełnia się sama przy zmianie statusu.</span></div>`;
+}
+function addHistoryEntry(text){
+  activityDraft.history.push({at: new Date().toISOString(), text});
+  renderActivityHistory();
+}
+function quickStatus(status, label, followUpDays){
+  const extra = document.getElementById('ac-new-entry').value.trim();
+  document.getElementById('ac-status').value = status;
+  if(status==='czeka' && !document.getElementById('ac-date').value) document.getElementById('ac-date').value = toDateStr(new Date());
+  if(followUpDays){
+    const f = new Date(); f.setDate(f.getDate()+followUpDays);
+    document.getElementById('ac-follow-up').value = toDateStr(f);
+  }
+  if(status==='zakonczone') document.getElementById('ac-follow-up').value = '';
+  addHistoryEntry(label + (extra ? ': ' + extra : ''));
+  activityDraft.status = status; // status change already logged
+  document.getElementById('ac-new-entry').value = '';
+}
+document.getElementById('ac-mark-sent').addEventListener('click', ()=>quickStatus('czeka', 'Wysłano – czekam na odpowiedź', 7));
+document.getElementById('ac-mark-reply').addEventListener('click', ()=>quickStatus('odpowiedz', 'Przyszła odpowiedź', 0));
+document.getElementById('ac-mark-done').addEventListener('click', ()=>quickStatus('zakonczone', 'Zakończone', 0));
+document.getElementById('ac-cancel').addEventListener('click', ()=>{
+  activityDraft = null;
+  document.getElementById('activity-overlay').classList.remove('show');
+});
+document.getElementById('ac-save').addEventListener('click', async ()=>{
+  if(!activityDraft) return;
+  const d = activityDraft;
+  const isNew = !document.getElementById('ac-id').value;
+  const newStatus = document.getElementById('ac-status').value;
+  const newFollowUp = document.getElementById('ac-follow-up').value;
+  if(newStatus !== d.status){
+    d.history.push({at:new Date().toISOString(), text:'Status: ' + (ACTIVITY_STATUS_LABEL[d.status]||d.status) + ' → ' + ACTIVITY_STATUS_LABEL[newStatus]});
+  }
+  if(!isNew && newFollowUp !== (d.followUp||'')){
+    d.history.push({at:new Date().toISOString(), text: newFollowUp ? 'Przypomnienie ustawione na ' + formatActivityDate(newFollowUp) : 'Usunięto przypomnienie'});
+  }
+  const extra = document.getElementById('ac-new-entry').value.trim();
+  if(extra) d.history.push({at:new Date().toISOString(), text: extra});
+  d.title = document.getElementById('ac-title').value.trim();
+  d.partner = document.getElementById('ac-partner').value.trim();
+  d.contact = document.getElementById('ac-contact').value.trim();
+  d.city = document.getElementById('ac-city').value;
+  d.channel = document.getElementById('ac-channel').value;
+  d.status = newStatus;
+  d.date = document.getElementById('ac-date').value;
+  d.followUp = newFollowUp;
+  d.content = document.getElementById('ac-content').value;
+  if(!d.title && !d.partner){ alert('Wpisz co robisz (tytuł) albo do kogo.'); return; }
+  if(isNew){
+    d.createdAt = new Date().toISOString();
+    d.history.unshift({at:d.createdAt, text:'Utworzono działanie (' + ACTIVITY_STATUS_LABEL[d.status] + ')'});
+  }
+  const { error } = await supabaseClient.from('activities').upsert(activityToRow(d));
+  if(error){ dbError('zapis działania', error); return; }
+  const idx = state.activities.findIndex(x=>x.id===d.id);
+  if(idx>=0) state.activities[idx] = d; else state.activities.push(d);
+  activityDraft = null;
+  flashSaved();
+  document.getElementById('activity-overlay').classList.remove('show');
+  if(document.getElementById('view-activities').classList.contains('active')) renderActivities();
+  if(document.getElementById('view-dashboard').classList.contains('active')) renderDashboard();
+});
+document.getElementById('ac-delete').addEventListener('click', async ()=>{
+  const id = document.getElementById('ac-id').value;
+  const a = state.activities.find(x=>x.id===id);
+  if(!a) return;
+  if(!confirm(`Czy na pewno usunąć działanie "${a.title||a.partner}" razem z całą historią? Tej operacji nie można cofnąć.\n\nJeśli sprawa jest po prostu zamknięta, lepiej ustaw status „Zakończone” – historia zostanie.`)) return;
+  const { error } = await supabaseClient.from('activities').delete().eq('id', id);
+  if(error){ dbError('usuwanie działania', error); return; }
+  state.activities = state.activities.filter(x=>x.id!==id);
+  activityDraft = null;
+  flashSaved();
+  document.getElementById('activity-overlay').classList.remove('show');
+  if(document.getElementById('view-activities').classList.contains('active')) renderActivities();
+  if(document.getElementById('view-dashboard').classList.contains('active')) renderDashboard();
+});
+
 /* ---------- SETTINGS ---------- */
 function renderSettings(){
   const el = document.getElementById('view-settings');
@@ -2828,6 +3178,9 @@ async function exportFullBackup(){
     notes: notesRes.data||[],
     files: filesRes.data||[]
   };
+  const activitiesBackup = await fetchAllRows('activities');
+  if(activitiesBackup.error){ dbError('pobieranie kopii zapasowej (działania)', activitiesBackup.error); return; }
+  backup.activities = activitiesBackup.data||[];
   const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -2895,6 +3248,7 @@ async function showApp(){
   document.getElementById('app-root').style.display = 'block';
   await loadAll();
   renderDashboard();
+  openTabFromHash();
 }
 async function attemptLogin(){
   const password = document.getElementById('login-password').value;
